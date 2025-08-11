@@ -1,0 +1,41 @@
+flowchart TD   
+    ProcessImage(["Process image"])
+    ProcessVideo(["Process video"])
+
+    ResizeDimensionsOperation["Prepare new dimensions for resize"]
+
+    IfApplyLogo{"Apply logo?"}
+    PrepareLogoOperation["Prepare logo for operation by resizing it based on the new image dimensions and the scale factor"]
+    
+    IfConvertFileType{"Convert file type?"}
+    ConvertFileTypeOperation["Prepare file type conversion when applicable"]
+    
+    IfConvertVideoCodec{"Convert video codec?"}
+    ConvertVideoCodec["Convert video codec when applicable"]
+
+    IfImage{"Is the file an image?"}
+
+    ImageProcessor("Image processor")
+    VideoProcessor("Video processor")
+
+    ProcessImage --> ResizeDimensionsOperation
+    ProcessVideo --> ResizeDimensionsOperation
+
+    ResizeDimensionsOperation --> IfApplyLogo
+
+    IfApplyLogo -- Yes --> PrepareLogoOperation
+    IfApplyLogo -- No --> IfConvertFileType
+    PrepareLogoOperation --> IfConvertFileType
+    
+    IfConvertFileType -- Yes --> ConvertFileTypeOperation
+    IfConvertFileType -- No --> IfImage
+    ConvertFileTypeOperation --> IfImage
+
+    IfImage -- Yes --> ImageProcessor
+    IfImage -- No --> IfConvertVideoCodec
+
+    IfConvertVideoCodec -- Yes --> ConvertVideoCodec
+
+    ConvertVideoCodec --> VideoProcessor
+    IfConvertVideoCodec --> VideoProcessor
+

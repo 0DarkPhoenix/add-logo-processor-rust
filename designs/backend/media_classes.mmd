@@ -1,0 +1,35 @@
+classDiagram
+    Media <|-- Image
+    Media <|-- Video
+
+    class Media {
+        +Resolution original_resolution
+        +u64 file_size
+        +str file_type
+        +Resolution resized_resolution
+
+        +resize_dimensions()
+        +add_logo()
+        +convert_file_type()
+        +create_preview()
+    }
+
+    class Image {
+    }
+
+    class Video {
+        +f64 duration
+        +str codec
+
+        +get_duration()
+        +convert_codec()
+    }
+
+    class Logo {
+        +u64 scale
+        +i64 x_offset
+        +i64 y_offset
+        +Resolution resized_resolution
+
+        +resize_logo()
+    }
