@@ -37,7 +37,7 @@ pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
     let output_path = output_directory.join(new_filename);
     resized_logo_img.save_with_format(
         &output_path,
-        ImageFormat::from_extension(&file_extension)
+        ImageFormat::from_extension(file_extension)
             .ok_or_else(|| format!("Unsupported image format for logo: {}", file_extension))?,
     )?;
 

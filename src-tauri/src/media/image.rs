@@ -1,4 +1,7 @@
-use std::{error::Error, path::PathBuf};
+use std::{
+    error::Error,
+    path::{Path, PathBuf},
+};
 
 use crate::utils::{read_file_size, read_file_type, read_image_resolution};
 
@@ -56,7 +59,7 @@ impl Media for Image {
 }
 
 /// Read the image file type, and maps it to a `ImageFormat` enum used by the `image` crate.
-fn read_image_file_type(file_path: &PathBuf) -> Result<ImageFormat, Box<dyn Error>> {
+fn read_image_file_type(file_path: &Path) -> Result<ImageFormat, Box<dyn Error>> {
     let file_type = read_file_type(file_path);
 
     let format = ImageFormat::from_extension(&file_type)

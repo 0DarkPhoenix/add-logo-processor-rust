@@ -1,26 +1,26 @@
 use rayon::prelude::*;
-use std::{error::Error, fs::read_dir, path::PathBuf};
+use std::{error::Error, fs::read_dir, path::Path};
 
 use crate::{
     handlers::handle_logos,
-    media::{Logo, Resolution, Video},
+    media::{Logo, Media, Resolution, Video},
     processors::process_video,
     utils::{config::VideoSettings, AppConfig},
 };
 
 pub fn handle_videos(config: &AppConfig) -> Result<(), Box<dyn Error + Send + Sync>> {
     let video_settings = &config.video_settings;
-    // Read all video paths from the input directory
+
     let input_directory = &video_settings.input_directory;
     let output_directory = &video_settings.output_directory;
 
-    // Create a vector to store Video structs
     let mut video_list = Vec::new();
 
     read_videos_in_input_directory(video_settings, input_directory, &mut video_list)?;
 
-    // Sort videos by file size in descending order (largest to smallest)
     sort_list_by_file_size(&mut video_list);
+
+    determ_resized_resolution_per_video(video_settings, &mut video_list);
 
     let logo_list = process_logos_for_video_resolutions(video_settings, &video_list)?;
 
@@ -29,9 +29,19 @@ pub fn handle_videos(config: &AppConfig) -> Result<(), Box<dyn Error + Send + Sy
     Ok(())
 }
 
+/// Determine the new resized dimensions for each image in the image list
+fn determ_resized_resolution_per_video(
+    video_settings: &VideoSettings,
+    video_list: &mut Vec<Video>,
+) {
+    for video in video_list {
+        video.resize_dimensions(video_settings.min_pixel_count);
+    }
+}
+
 /// Process the videos from the video list in parallel
 fn process_videos_from_video_list(
-    output_directory: &PathBuf,
+    output_directory: &Path,
     video_list: Vec<Video>,
     logo_list: Option<Vec<Logo>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -45,6 +55,14 @@ fn process_videos_from_video_list(
             } else {
                 None
             };
+
+            if logo.is_none() && logo_list.is_some() {
+                return Err(format!(
+                    "No logo found for the given video resolution: {}",
+                    video.resolution
+                )
+                .into());
+            }
 
             process_video(video, logo, output_directory).map_err(
                 |e| -> Box<dyn Error + Send + Sync> {
@@ -79,11 +97,11 @@ fn process_logos_for_video_resolutions(
 /// Reads all videos in the input directory, and adds them to the video list
 fn read_videos_in_input_directory(
     video_settings: &VideoSettings,
-    input_directory: &PathBuf,
+    input_directory: &Path,
     video_list: &mut Vec<Video>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    Ok(if video_settings.search_child_folders {
-        read_videos_recursive(&input_directory, video_list)?;
+    let _: () = if video_settings.search_child_folders {
+        read_videos_recursive(input_directory, video_list)?;
     } else {
         // Non-recursive search (only search videos in current directory)
         for entry in read_dir(input_directory)? {
@@ -95,12 +113,13 @@ fn read_videos_in_input_directory(
                 }
             }
         }
-    })
+    };
+    Ok(())
 }
 
 /// Recursively read all videos from child directories
 fn read_videos_recursive(
-    dir: &PathBuf,
+    dir: &Path,
     videos: &mut Vec<Video>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
     for entry in std::fs::read_dir(dir)? {
@@ -120,6 +139,6 @@ fn read_videos_recursive(
 }
 
 /// Sorts the video list by file size in descending order (largest to smallest)
-fn sort_list_by_file_size(video_list: &mut Vec<Video>) {
+fn sort_list_by_file_size(video_list: &mut [Video]) {
     video_list.sort_by(|a, b| b.file_size.cmp(&a.file_size));
 }

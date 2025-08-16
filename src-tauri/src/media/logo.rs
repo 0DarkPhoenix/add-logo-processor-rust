@@ -1,9 +1,6 @@
 use std::{error::Error, path::PathBuf};
 
-use crate::{
-    media::{Corner, Position, Resolution},
-    utils::read_image_resolution,
-};
+use crate::media::{Corner, Position, Resolution};
 
 use serde::{Deserialize, Serialize};
 
@@ -24,11 +21,8 @@ impl Logo {
         y_offset_scale: i32,
         compatible_image_resolution: Resolution,
     ) -> Result<Self, Box<dyn Error>> {
-        let raw_logo_resolution = read_image_resolution(&file_path)?;
+        let resolution = transform_resolution_with_scale(&compatible_image_resolution, scale);
 
-        let resolution = transform_resolution_with_scale(raw_logo_resolution, scale);
-
-        // Calculate the position based on corner and offsets
         let position = calculate_position(
             corner,
             &compatible_image_resolution,
@@ -99,7 +93,7 @@ fn calculate_position(
     }
 }
 
-fn transform_resolution_with_scale(resolution: Resolution, scale: u32) -> Resolution {
+fn transform_resolution_with_scale(resolution: &Resolution, scale: u32) -> Resolution {
     let decimal_scale = scale as f64 / 100.0;
     Resolution {
         width: (resolution.width as f64 * decimal_scale) as u32,

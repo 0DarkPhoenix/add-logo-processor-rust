@@ -1,15 +1,19 @@
-use std::{error::Error, fs::metadata, path::PathBuf};
+use std::{
+    error::Error,
+    fs::metadata,
+    path::{Path, PathBuf},
+};
 
 use image::{DynamicImage, GenericImageView, ImageReader};
 
-use crate::media::{Logo, Resolution};
+use crate::media::Resolution;
 
 pub fn read_file_size(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
-    let metadata = metadata(&file_path)?;
+    let metadata = metadata(file_path)?;
     Ok(metadata.len())
 }
 
-pub fn read_file_type(file_path: &PathBuf) -> String {
+pub fn read_file_type(file_path: &Path) -> String {
     file_path
         .extension()
         .and_then(|ext| ext.to_str())
@@ -40,15 +44,4 @@ pub fn resize_image(
     );
 
     Ok(resized)
-}
-
-pub fn select_logo_for_resolution<'a>(
-    resolution: &Resolution,
-    logo_list: &'a Vec<Logo>,
-) -> Result<&'a Logo, Box<dyn Error>> {
-    let logo = logo_list
-        .iter()
-        .find(|logo| &logo.compatible_image_resolution == resolution)
-        .ok_or("No logo found for the given image resolution")?;
-    Ok(logo)
 }

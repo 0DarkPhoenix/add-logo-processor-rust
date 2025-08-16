@@ -1,4 +1,4 @@
-use std::{error::Error, path::PathBuf};
+use std::{error::Error, path::Path};
 
 use crate::{
     media::{Image, Logo},
@@ -9,7 +9,7 @@ use image::{DynamicImage, ImageReader};
 pub fn process_image(
     image: &Image,
     logo: Option<&Logo>,
-    output_directory: &PathBuf,
+    output_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     let img = load_image(&image.file_path)?;
 

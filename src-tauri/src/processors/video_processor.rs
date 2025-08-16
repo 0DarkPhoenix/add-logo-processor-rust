@@ -1,12 +1,12 @@
 use crate::media::{Logo, Video};
 use ffmpeg_sidecar::{command::FfmpegCommand, download::auto_download};
 use std::error::Error;
-use std::path::PathBuf;
+use std::path::Path;
 
 pub fn process_video(
     video: &Video,
     logo: Option<&Logo>,
-    output_directory: &PathBuf,
+    output_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
     // Ensure ffmpeg is available
     auto_download()?;
@@ -15,7 +15,7 @@ pub fn process_video(
     let mut command = FfmpegCommand::new();
 
     // Input video file
-    command.input(&video.file_path.to_str().ok_or("Invalid video file path")?);
+    command.input(video.file_path.to_str().ok_or("Invalid video file path")?);
 
     // Build filter complex for video processing
     let mut filter_parts = Vec::new();
@@ -44,7 +44,7 @@ pub fn process_video(
     // Apply filter complex
     let filter_complex = filter_parts.join(";");
     command.args(["-filter_complex", &filter_complex]);
-    command.args(["-map", &current_stream.trim_matches(['[', ']'])]);
+    command.args(["-map", current_stream.trim_matches(['[', ']'])]);
     command.args(["-map", "0:a"]); // Copy audio stream
 
     // Set codec
@@ -58,7 +58,7 @@ pub fn process_video(
     command.args(["-preset", "medium"]); // Encoding speed vs compression
 
     // Output file
-    command.output(&output_directory.to_str().ok_or("Invalid output path")?);
+    command.output(output_directory.to_str().ok_or("Invalid output path")?);
 
     // Overwrite output file if it exists
     command.overwrite();

@@ -55,7 +55,44 @@ pub struct VideoSettings {
 
 impl Default for AppConfig {
     fn default() -> Self {
-        Self {}
+        Self {
+            image_settings: ImageSettings {
+                input_directory: PathBuf::from("input"),
+                output_directory: PathBuf::from("output"),
+                search_child_folders: false,
+                keep_child_folders_structure_in_output_directory: false,
+                min_pixel_count: 1080,
+                add_logo: false,
+                logo_path: None,
+                logo_scale: 10,
+                logo_x_offset_scale: 0,
+                logo_y_offset_scale: 0,
+                logo_corner: Corner::TopLeft,
+                should_convert_format: false,
+                format: ImageFormat::Png,
+                clear_files_input_directory: false,
+                clear_files_output_directory: false,
+                overwrite_existing_files_output_directory: false,
+            },
+            video_settings: VideoSettings {
+                input_directory: PathBuf::from("input"),
+                output_directory: PathBuf::from("output"),
+                search_child_folders: false,
+                keep_child_folders_structure_in_output_directory: false,
+                min_pixel_count: 1080,
+                add_logo: false,
+                logo_path: None,
+                logo_scale: 10,
+                logo_x_offset_scale: 0,
+                logo_y_offset_scale: 0,
+                logo_corner: Corner::TopLeft,
+                should_convert_format: false,
+                format: ImageFormat::Png,
+                clear_files_input_directory: false,
+                clear_files_output_directory: false,
+                overwrite_existing_files_output_directory: false,
+            },
+        }
     }
 }
 
@@ -80,7 +117,7 @@ impl AppConfig {
     }
 
     /// Load configuration from file or create default
-    fn load_or_create_default(app_handle: &AppHandle) -> Result<AppConfig, Box<dyn Error>> {
+    pub fn load_or_create_default(app_handle: &AppHandle) -> Result<AppConfig, Box<dyn Error>> {
         let config_path = Self::get_config_path(app_handle)?;
 
         if config_path.exists() {
