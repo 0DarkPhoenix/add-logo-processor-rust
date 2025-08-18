@@ -60,35 +60,37 @@ fn apply_image_settings_per_image(image_settings: &ImageSettings, image_list: &m
     });
 }
 
-/// Process the images from the image list sequentially
+/// Process the images from the image list in parallel
 fn process_images_from_image_list(
     output_directory: &Path,
     image_list: Vec<Image>,
     logo_list: Option<Vec<Logo>>,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    for image in &image_list {
-        let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
-            logo_list
-                .iter()
-                .find(|logo| logo.compatible_image_resolution == image.resolution)
-        } else {
-            None
-        };
+    image_list
+        .par_iter()
+        .try_for_each(|image| -> Result<(), Box<dyn Error + Send + Sync>> {
+            let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
+                logo_list
+                    .iter()
+                    .find(|logo| logo.compatible_image_resolution == image.resolution)
+            } else {
+                None
+            };
 
-        if logo.is_none() && logo_list.is_some() {
-            return Err(format!(
-                "No logo found for the given image resolution: {}",
-                image.resolution
+            if logo.is_none() && logo_list.is_some() {
+                return Err(format!(
+                    "No logo found for the given image resolution: {}",
+                    image.resolution
+                )
+                .into());
+            }
+
+            process_image(image, logo, output_directory).map_err(
+                |e| -> Box<dyn Error + Send + Sync> {
+                    format!("Failed to process image: {}", e).into()
+                },
             )
-            .into());
-        }
-
-        process_image(image, logo, output_directory).map_err(
-            |e| -> Box<dyn Error + Send + Sync> {
-                format!("Failed to process image: {}", e).into()
-            },
-        )?;
-    }
+        })?;
     Ok(())
 }
 
