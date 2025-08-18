@@ -1,56 +1,190 @@
 use image::ImageFormat;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::path::PathBuf;
-use std::sync::OnceLock;
+use std::sync::{OnceLock, RwLock};
 use std::{error::Error, fs};
 use tauri::{AppHandle, Manager};
+use ts_rs::TS;
 
+use crate::media::image::{get_image_format_string, image_format_strings};
 use crate::media::Corner;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Custom serialization for `PathBuf`
+#[allow(clippy::ptr_arg)]
+fn serialize_pathbuf<S>(path: &PathBuf, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    path.to_string_lossy().serialize(serializer)
+}
+
+/// Custom deserialization for `PathBuf`
+fn deserialize_pathbuf<'de, D>(deserializer: D) -> Result<PathBuf, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    Ok(PathBuf::from(s))
+}
+
+/// Custom serialization for `Option<PathBuf>`
+fn serialize_optional_pathbuf<S>(path: &Option<PathBuf>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    match path {
+        Some(p) => Some(p.to_string_lossy().to_string()).serialize(serializer),
+        None => serializer.serialize_none(),
+    }
+}
+
+/// Custom deserialization for `Option<PathBuf>`
+fn deserialize_optional_pathbuf<'de, D>(deserializer: D) -> Result<Option<PathBuf>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let opt: Option<String> = Option::deserialize(deserializer)?;
+    Ok(opt.map(PathBuf::from))
+}
+
+/// Custom serialization for `ImageFormat`
+fn serialize_image_format<S>(format: &ImageFormat, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let format_str = get_image_format_string(format);
+    format_str.serialize(serializer)
+}
+
+/// Custom deserialization for `ImageFormat`
+fn deserialize_image_format<'de, D>(deserializer: D) -> Result<ImageFormat, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let s = String::deserialize(deserializer)?;
+    match s.as_str() {
+        image_format_strings::PNG => Ok(ImageFormat::Png),
+        image_format_strings::JPEG => Ok(ImageFormat::Jpeg),
+        image_format_strings::WEBP => Ok(ImageFormat::WebP),
+        image_format_strings::BMP => Ok(ImageFormat::Bmp),
+        image_format_strings::GIF => Ok(ImageFormat::Gif),
+        image_format_strings::TIFF => Ok(ImageFormat::Tiff),
+        image_format_strings::ICO => Ok(ImageFormat::Ico),
+        image_format_strings::PNM => Ok(ImageFormat::Pnm),
+        image_format_strings::TGA => Ok(ImageFormat::Tga),
+        image_format_strings::HDR => Ok(ImageFormat::Hdr),
+        image_format_strings::EXR => Ok(ImageFormat::OpenExr),
+        image_format_strings::FF => Ok(ImageFormat::Farbfeld),
+        image_format_strings::AVIF => Ok(ImageFormat::Avif),
+        image_format_strings::QOI => Ok(ImageFormat::Qoi),
+        _ => Ok(ImageFormat::Png), // default fallback
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/types/", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct AppConfig {
     pub image_settings: ImageSettings,
     pub video_settings: VideoSettings,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/types/", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ImageSettings {
+    #[serde(
+        serialize_with = "serialize_pathbuf",
+        deserialize_with = "deserialize_pathbuf"
+    )]
+    #[ts(type = "string")]
     pub input_directory: PathBuf,
+
+    #[serde(
+        serialize_with = "serialize_pathbuf",
+        deserialize_with = "deserialize_pathbuf"
+    )]
+    #[ts(type = "string")]
     pub output_directory: PathBuf,
+
+    pub clear_files_input_directory: bool,
     pub search_child_folders: bool,
+    pub clear_files_output_directory: bool,
     pub keep_child_folders_structure_in_output_directory: bool,
+    pub overwrite_existing_files_output_directory: bool,
     pub min_pixel_count: u32,
     pub add_logo: bool,
+
+    #[serde(
+        serialize_with = "serialize_optional_pathbuf",
+        deserialize_with = "deserialize_optional_pathbuf"
+    )]
+    #[ts(type = "string | null")]
     pub logo_path: Option<PathBuf>,
+
     pub logo_scale: u32,
     pub logo_x_offset_scale: i32,
     pub logo_y_offset_scale: i32,
     pub logo_corner: Corner,
     pub should_convert_format: bool,
+
+    #[serde(
+        serialize_with = "serialize_image_format",
+        deserialize_with = "deserialize_image_format"
+    )]
+    #[ts(
+        type = "\"png\" | \"jpeg\" | \"webp\" | \"bmp\" | \"gif\" | \"tiff\" | \"ico\" | \"pnm\" | \"tga\" | \"hdr\" | \"exr\" | \"ff\" | \"avif\" | \"qoi\""
+    )]
     pub format: ImageFormat,
-    pub clear_files_input_directory: bool,
-    pub clear_files_output_directory: bool,
-    pub overwrite_existing_files_output_directory: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/types/", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct VideoSettings {
+    #[serde(
+        serialize_with = "serialize_pathbuf",
+        deserialize_with = "deserialize_pathbuf"
+    )]
+    #[ts(type = "string")]
     pub input_directory: PathBuf,
+
+    #[serde(
+        serialize_with = "serialize_pathbuf",
+        deserialize_with = "deserialize_pathbuf"
+    )]
+    #[ts(type = "string")]
     pub output_directory: PathBuf,
+
+    pub clear_files_input_directory: bool,
     pub search_child_folders: bool,
+    pub clear_files_output_directory: bool,
     pub keep_child_folders_structure_in_output_directory: bool,
+    pub overwrite_existing_files_output_directory: bool,
     pub min_pixel_count: u32,
     pub add_logo: bool,
+
+    #[serde(
+        serialize_with = "serialize_optional_pathbuf",
+        deserialize_with = "deserialize_optional_pathbuf"
+    )]
+    #[ts(type = "string | null")]
     pub logo_path: Option<PathBuf>,
+
     pub logo_scale: u32,
     pub logo_x_offset_scale: i32,
     pub logo_y_offset_scale: i32,
     pub logo_corner: Corner,
     pub should_convert_format: bool,
+
+    #[serde(
+        serialize_with = "serialize_image_format",
+        deserialize_with = "deserialize_image_format"
+    )]
+    #[ts(
+        type = "\"png\" | \"jpeg\" | \"webp\" | \"bmp\" | \"gif\" | \"tiff\" | \"ico\" | \"pnm\" | \"tga\" | \"hdr\" | \"exr\" | \"ff\" | \"avif\" | \"qoi\""
+    )]
     pub format: ImageFormat,
-    pub clear_files_input_directory: bool,
-    pub clear_files_output_directory: bool,
-    pub overwrite_existing_files_output_directory: bool,
 }
 
 impl Default for AppConfig {
@@ -96,29 +230,71 @@ impl Default for AppConfig {
     }
 }
 
-// Global configuration instance
-static CONFIG: OnceLock<AppConfig> = OnceLock::new();
+// Global configuration instance with RwLock for thread-safe mutation
+static CONFIG: OnceLock<RwLock<AppConfig>> = OnceLock::new();
 
 impl AppConfig {
     /// Initialize the global configuration with app handle
     pub fn init(app_handle: &AppHandle) -> Result<(), Box<dyn Error>> {
         let config = Self::load_or_create_default(app_handle)?;
         CONFIG
-            .set(config)
+            .set(RwLock::new(config))
             .map_err(|_| "Failed to set global config")?;
         Ok(())
     }
 
-    /// Get the global configuration instance
-    pub fn global() -> &'static AppConfig {
+    /// Get a clone of the global configuration instance
+    pub fn global() -> AppConfig {
         CONFIG
             .get()
             .expect("Config not initialized. Call AppConfig::init() first.")
+            .read()
+            .unwrap()
+            .clone()
+    }
+
+    /// Update only image settings in global config and save
+    pub fn update_global_image_settings(
+        image_settings: ImageSettings,
+        app_handle: &AppHandle,
+    ) -> Result<(), Box<dyn Error>> {
+        let config_lock = CONFIG
+            .get()
+            .expect("Config not initialized. Call AppConfig::init() first.");
+
+        {
+            let mut config = config_lock.write().unwrap();
+            config.image_settings = image_settings;
+        }
+
+        // Save the updated config
+        let config = config_lock.read().unwrap();
+        config.save(app_handle)
+    }
+
+    /// Update only video settings in global config and save
+    pub fn update_global_video_settings(
+        video_settings: VideoSettings,
+        app_handle: &AppHandle,
+    ) -> Result<(), Box<dyn Error>> {
+        let config_lock = CONFIG
+            .get()
+            .expect("Config not initialized. Call AppConfig::init() first.");
+
+        {
+            let mut config = config_lock.write().unwrap();
+            config.video_settings = video_settings;
+        }
+
+        // Save the updated config
+        let config = config_lock.read().unwrap();
+        config.save(app_handle)
     }
 
     /// Load configuration from file or create default
     pub fn load_or_create_default(app_handle: &AppHandle) -> Result<AppConfig, Box<dyn Error>> {
         let config_path = Self::get_config_path(app_handle)?;
+        dbg!(&config_path);
 
         if config_path.exists() {
             let config_str = fs::read_to_string(&config_path)?;
@@ -129,6 +305,26 @@ impl AppConfig {
             default_config.save(app_handle)?;
             Ok(default_config)
         }
+    }
+
+    /// Update only image settings and save (instance method)
+    pub fn update_image_settings(
+        &mut self,
+        image_settings: ImageSettings,
+        app_handle: &AppHandle,
+    ) -> Result<(), Box<dyn Error>> {
+        self.image_settings = image_settings;
+        self.save(app_handle)
+    }
+
+    /// Update only video settings and save (instance method)
+    pub fn update_video_settings(
+        &mut self,
+        video_settings: VideoSettings,
+        app_handle: &AppHandle,
+    ) -> Result<(), Box<dyn Error>> {
+        self.video_settings = video_settings;
+        self.save(app_handle)
     }
 
     /// Save configuration to file

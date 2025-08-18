@@ -1,6 +1,9 @@
 use std::{error::Error, path::PathBuf};
 
-use crate::media::{Corner, Position, Resolution};
+use crate::{
+    media::{media::calculate_resize_dimensions, Corner, Position, Resolution},
+    utils::read_image_resolution,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -21,7 +24,8 @@ impl Logo {
         y_offset_scale: i32,
         compatible_image_resolution: Resolution,
     ) -> Result<Self, Box<dyn Error>> {
-        let resolution = transform_resolution_with_scale(&compatible_image_resolution, scale);
+        let resolution =
+            transform_resolution_with_scale(&file_path, &compatible_image_resolution, scale);
 
         let position = calculate_position(
             corner,
@@ -47,8 +51,9 @@ fn calculate_position(
     x_offset_scale: i32,
     y_offset_scale: i32,
 ) -> Position {
-    let x_offset = (image_resolution.width as f64 * x_offset_scale as f64 / 100.0) as i32;
-    let y_offset = (image_resolution.height as f64 * y_offset_scale as f64 / 100.0) as i32;
+    // Using 200.0 instead of 100.0 for more accurate control over the logo using the range that the user can input for offsets
+    let x_offset = (image_resolution.width as f64 * x_offset_scale as f64 / 200.0) as i32;
+    let y_offset = (image_resolution.height as f64 * y_offset_scale as f64 / 200.0) as i32;
 
     let (base_x, base_y, x_direction, y_direction) = match corner {
         Corner::TopLeft => (
@@ -76,7 +81,6 @@ fn calculate_position(
             -1, // Move up
         ),
     };
-
     let final_x = (base_x + x_offset * x_direction)
         .max(0)
         .min(image_resolution.width as i32 - logo_resolution.width as i32)
@@ -93,10 +97,17 @@ fn calculate_position(
     }
 }
 
-fn transform_resolution_with_scale(resolution: &Resolution, scale: u32) -> Resolution {
-    let decimal_scale = scale as f64 / 100.0;
-    Resolution {
-        width: (resolution.width as f64 * decimal_scale) as u32,
-        height: (resolution.height as f64 * decimal_scale) as u32,
-    }
+fn transform_resolution_with_scale(
+    logo_path: &PathBuf,
+    resolution: &Resolution,
+    scale: u32,
+) -> Resolution {
+    let logo_resolution = read_image_resolution(logo_path).unwrap();
+
+    let min_pixel_count = if resolution.width < resolution.height {
+        resolution.width * scale / 100
+    } else {
+        resolution.height * scale / 100
+    };
+    calculate_resize_dimensions(&logo_resolution, min_pixel_count)
 }

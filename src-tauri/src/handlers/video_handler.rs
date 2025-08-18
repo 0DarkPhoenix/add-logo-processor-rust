@@ -5,12 +5,10 @@ use crate::{
     handlers::handle_logos,
     media::{Logo, Media, Resolution, Video},
     processors::process_video,
-    utils::{config::VideoSettings, AppConfig},
+    utils::config::VideoSettings,
 };
 
-pub fn handle_videos(config: &AppConfig) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let video_settings = &config.video_settings;
-
+pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error + Send + Sync>> {
     let input_directory = &video_settings.input_directory;
     let output_directory = &video_settings.output_directory;
 

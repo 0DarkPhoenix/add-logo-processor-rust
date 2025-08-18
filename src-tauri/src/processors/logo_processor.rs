@@ -1,16 +1,16 @@
 use std::error::Error;
 
-use image::ImageFormat;
+use image::{DynamicImage, ImageFormat};
 
 use crate::{
-    media::Logo,
-    utils::{load_image, resize_image},
+    media::{Logo, Resolution},
+    utils::load_image,
 };
 
 pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
     let logo_img = load_image(&logo.file_path)?;
 
-    let resized_logo_img = resize_image(logo_img, &logo.resolution)?;
+    let resized_logo_img = resize_logo(logo_img, &logo.resolution)?;
 
     // Create a fixed folder structure in the application root
     let app_root = std::env::current_exe()?
@@ -45,4 +45,16 @@ pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
     logo.file_path = output_path;
 
     Ok(())
+}
+
+fn resize_logo(
+    logo_img: DynamicImage,
+    resolution: &Resolution,
+) -> Result<DynamicImage, Box<dyn Error>> {
+    let resized_logo_img = logo_img.resize(
+        resolution.width,
+        resolution.height,
+        image::imageops::FilterType::Lanczos3,
+    );
+    Ok(resized_logo_img)
 }
