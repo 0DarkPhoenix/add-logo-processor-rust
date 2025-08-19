@@ -52,6 +52,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 
     Ok(())
 }
+
 /// Apply the image settings per image in parallel
 fn apply_image_settings_per_image(image_settings: &ImageSettings, image_list: &mut Vec<Image>) {
     image_list.par_iter_mut().for_each(|image| {

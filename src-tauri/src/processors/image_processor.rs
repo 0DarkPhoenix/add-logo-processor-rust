@@ -54,7 +54,7 @@ pub fn process_image(
     let output_path = output_directory.join(new_filename);
 
     let file = File::create(&output_path)?;
-    let mut writer = BufWriter::with_capacity(8192 * 16, file); // 128KB buffer
+    let mut writer = BufWriter::with_capacity(8192 * 128, file); // 1MB buffer
     resized_img.write_to(&mut writer, image.file_type)?;
     writer.flush()?;
     let save_duration = save_start.elapsed();
