@@ -6,8 +6,6 @@ use crate::{
 };
 use image::ImageFormat;
 use image::{DynamicImage, ImageReader};
-use std::fs::File;
-use std::io::{BufWriter, Write};
 use std::time::Instant;
 use std::{error::Error, path::Path};
 
@@ -53,10 +51,8 @@ pub fn process_image(
     let new_filename = format!("{}.{}", file_stem, new_extension);
     let output_path = output_directory.join(new_filename);
 
-    let file = File::create(&output_path)?;
-    let mut writer = BufWriter::with_capacity(8192 * 128, file); // 1MB buffer
-    resized_img.write_to(&mut writer, image.file_type)?;
-    writer.flush()?;
+    resized_img.save(&output_path)?;
+
     let save_duration = save_start.elapsed();
     println!("Image save time: {:?}", save_duration);
 

@@ -22,7 +22,7 @@ pub fn read_file_type(file_path: &Path) -> String {
 }
 
 pub fn load_image(path: &PathBuf) -> Result<DynamicImage, Box<dyn Error>> {
-    let img = ImageReader::open(path)?.decode()?;
+    let img = image::open(path)?;
     Ok(img)
 }
 

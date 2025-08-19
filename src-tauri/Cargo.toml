@@ -1,5 +1,5 @@
 [package]
-    authors    =["0DarkPhoenix"]
+    authors    = ["0DarkPhoenix"]
     description="Image and video processor for resizing media, changing file types and adding a logo"
     edition    ="2021"
     name       ="add-logo-processor"
@@ -11,21 +11,21 @@
     # The `_lib` suffix may seem redundant but it is necessary
     # to make the lib name unique and wouldn't conflict with the bin name.
     # This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
-    crate-type=["cdylib", "rlib", "staticlib"]
+    crate-type= ["cdylib", "rlib", "staticlib"]
     name      ="add_logo_processor_lib"
 
 [build-dependencies]
-    tauri-build={version="2", features=[]}
+    tauri-build= {version="2", features= [] }
     ts-rs      ="11.0"
 
 [dependencies]
     fast_image_resize  ="5.2.1"
     ffmpeg-sidecar     ="2.1"
-    image              ={version="0.25", features=["serde"]}
+    image              = {version="0.25", features= ["serde"] }
     rayon              ="1.11"
-    serde              ={version="1", features=["derive"]}
+    serde              = {version="1", features= ["derive"] }
     serde_json         ="1"
-    tauri              ={version="2", features=[]}
+    tauri              = {version="2", features= [] }
     tauri-plugin-dialog="2"
     tauri-plugin-opener="2"
     ts-rs              ="11.0"
