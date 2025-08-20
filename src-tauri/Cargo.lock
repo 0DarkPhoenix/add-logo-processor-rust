@@ -17,6 +17,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "ts-rs",
+ "walkdir",
 ]
 
 [[package]]

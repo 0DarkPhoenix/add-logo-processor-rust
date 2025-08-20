@@ -50,10 +50,8 @@ export function ResizeDimensionsCard() {
 							id={`${baseId}-shouldConvertFormat`}
 							checked={shouldConvertFormat}
 							onCheckedChange={(checked) => setValue("shouldConvertFormat", checked)}
+							label='Convert format'
 						/>
-						<Label htmlFor={`${baseId}-shouldConvertFormat`} className='text-sm'>
-							Convert image format
-						</Label>
 					</div>
 
 					<div>

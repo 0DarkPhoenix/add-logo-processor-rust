@@ -1,8 +1,7 @@
 use std::{error::Error, path::PathBuf};
 
-use crate::{
-    media::{media::calculate_resize_dimensions, Corner, Position, Resolution},
-    utils::read_image_resolution,
+use crate::media::{
+    image::read_image_resolution, media::calculate_resize_dimensions, Corner, Position, Resolution,
 };
 
 use serde::{Deserialize, Serialize};

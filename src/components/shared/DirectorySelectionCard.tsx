@@ -37,10 +37,8 @@ export function DirectorySelectionCard() {
 									onCheckedChange={(checked) =>
 										setValue("searchChildFolders", checked)
 									}
+									label='Search child folders'
 								/>
-								<Label htmlFor={`${baseId}-searchChildFolders`} className='text-sm'>
-									Search child folders
-								</Label>
 							</div>
 							<div className='flex items-center space-x-2'>
 								<Switch
@@ -49,13 +47,8 @@ export function DirectorySelectionCard() {
 									onCheckedChange={(checked) =>
 										setValue("clearFilesInputDirectory", checked)
 									}
+									label='Clear input directory'
 								/>
-								<Label
-									htmlFor={`${baseId}-clearFilesInputDirectory`}
-									className='text-sm'
-								>
-									Clear input directory
-								</Label>
 							</div>
 						</div>
 						<div className='flex-1'>
@@ -91,13 +84,8 @@ export function DirectorySelectionCard() {
 											checked,
 										)
 									}
+									label='Keep folder structure'
 								/>
-								<Label
-									htmlFor={`${baseId}-keepChildFoldersStructureInOutputDirectory`}
-									className='text-sm'
-								>
-									Keep folder structure
-								</Label>
 							</div>
 							<div className='flex items-center space-x-2'>
 								<Switch
@@ -106,13 +94,8 @@ export function DirectorySelectionCard() {
 									onCheckedChange={(checked) =>
 										setValue("overwriteExistingFilesOutputDirectory", checked)
 									}
+									label='Overwrite existing files'
 								/>
-								<Label
-									htmlFor={`${baseId}-overwriteExistingFilesOutputDirectory`}
-									className='text-sm'
-								>
-									Overwrite existing files
-								</Label>
 							</div>
 							<div className='flex items-center space-x-2'>
 								<Switch
@@ -121,13 +104,8 @@ export function DirectorySelectionCard() {
 									onCheckedChange={(checked) =>
 										setValue("clearFilesOutputDirectory", checked)
 									}
+									label='Clear output directory'
 								/>
-								<Label
-									htmlFor={`${baseId}-clearFilesOutputDirectory`}
-									className='text-sm'
-								>
-									Clear output directory
-								</Label>
 							</div>
 						</div>
 						<div className='flex-1'>

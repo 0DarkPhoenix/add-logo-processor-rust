@@ -32,10 +32,8 @@ export function LogoConfiguratorCard() {
 						id={`${baseId}-addLogo`}
 						checked={addLogo}
 						onCheckedChange={(checked) => setValue("addLogo", checked)}
+						label='Add logo to images'
 					/>
-					<Label htmlFor={`${baseId}-addLogo`} className='text-sm'>
-						Add logo to images
-					</Label>
 				</div>
 
 				{/* Logo File Selection */}

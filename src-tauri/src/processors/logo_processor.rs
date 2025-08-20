@@ -2,10 +2,7 @@ use std::error::Error;
 
 use image::{DynamicImage, ImageFormat};
 
-use crate::{
-    media::{Logo, Resolution},
-    utils::load_image,
-};
+use crate::media::{image::load_image, Logo, Resolution};
 
 pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
     let logo_img = load_image(&logo.file_path)?;

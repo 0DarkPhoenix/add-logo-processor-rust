@@ -1,27 +1,122 @@
-import * as SwitchPrimitive from "@radix-ui/react-switch";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
+interface SwitchProps {
+	checked?: boolean;
+	onCheckedChange?: (checked: boolean) => void;
+	disabled?: boolean;
+	className?: string;
+	id?: string;
+	label?: string;
+	labelPosition?: "left" | "right";
+	labelClassName?: string;
+}
+
 function Switch({
+	checked = false,
+	onCheckedChange,
+	disabled = false,
 	className,
+	id,
+	label,
+	labelPosition = "right",
+	labelClassName,
 	...props
-}: React.ComponentProps<typeof SwitchPrimitive.Root>) {
-	return (
-		<SwitchPrimitive.Root
-			data-slot="switch"
-			className={cn(
-				"peer data-[state=checked]:bg-primary data-[state=unchecked]:bg-input focus-visible:border-ring focus-visible:ring-ring/50 dark:data-[state=unchecked]:bg-input/80 inline-flex h-[1.15rem] w-8 shrink-0 items-center rounded-full border border-transparent shadow-xs transition-all outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50",
-				className,
-			)}
+}: SwitchProps) {
+	const handleClick = () => {
+		if (!disabled && onCheckedChange) {
+			onCheckedChange(!checked);
+		}
+	};
+
+	const handleKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === " " || e.key === "Enter") {
+			e.preventDefault();
+			handleClick();
+		}
+	};
+
+	// Use hardcoded colors that work in both light and dark mode
+	const getBackgroundColor = () => {
+		if (checked) {
+			return "#3569bb"; // Blue when checked
+		}
+		return "#9f9fa0"; // Light gray when unchecked
+	};
+
+	const getThumbColor = () => {
+		return "#eeeeee"; // Always white thumb
+	};
+
+	const switchElement = (
+		<button
+			type='button'
+			role='switch'
+			aria-checked={checked}
+			disabled={disabled}
+			onClick={handleClick}
+			onKeyDown={handleKeyDown}
+			id={id}
+			className={cn("switch-container", className)}
+			style={{
+				all: "unset",
+				display: "inline-flex",
+				alignItems: "center",
+				width: "44px",
+				height: "24px",
+				backgroundColor: getBackgroundColor(),
+				borderRadius: "12px",
+				position: "relative",
+				cursor: disabled ? "not-allowed" : "pointer",
+				opacity: disabled ? 0.5 : 1,
+				transition: "background-color 0.2s ease",
+				border: "2px solid transparent",
+				boxSizing: "border-box",
+			}}
 			{...props}
 		>
-			<SwitchPrimitive.Thumb
-				data-slot="switch-thumb"
-				className={cn(
-					"bg-background dark:data-[state=unchecked]:bg-foreground dark:data-[state=checked]:bg-primary-foreground pointer-events-none block size-4 rounded-full ring-0 transition-transform data-[state=checked]:translate-x-[calc(100%-2px)] data-[state=unchecked]:translate-x-0",
-				)}
+			<div
+				className='switch-thumb'
+				style={{
+					width: "18px",
+					height: "18px",
+					backgroundColor: getThumbColor(),
+					borderRadius: "50%",
+					position: "absolute",
+					left: "2px",
+					top: "50%",
+					transform: `translateY(-50%) translateX(${checked ? "20px" : "0px"})`,
+					transition: "transform 0.2s ease",
+					boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
+				}}
 			/>
-		</SwitchPrimitive.Root>
+		</button>
+	);
+
+	if (!label) {
+		return switchElement;
+	}
+
+	return (
+		<div
+			className={cn(
+				"flex items-center gap-2",
+				labelPosition === "left" && "flex-row-reverse",
+				disabled && "opacity-50 cursor-not-allowed",
+			)}
+		>
+			{switchElement}
+			<label
+				htmlFor={id}
+				className={cn(
+					"text-sm font-medium leading-none cursor-pointer select-none",
+					disabled && "cursor-not-allowed",
+					labelClassName,
+				)}
+			>
+				{label}
+			</label>
+		</div>
 	);
 }
 

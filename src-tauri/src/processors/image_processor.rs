@@ -1,11 +1,9 @@
+use crate::media::image::{load_image, resize_image};
 use crate::media::Image;
-use crate::utils::load_image;
-use crate::{
-    media::{image::get_image_format_string, Logo},
-    utils::resize_image,
-};
+use crate::media::{image::get_image_format_string, Logo};
 use image::ImageFormat;
 use image::{DynamicImage, ImageReader};
+use std::fs::create_dir_all;
 use std::time::Instant;
 use std::{error::Error, path::Path};
 
@@ -51,6 +49,7 @@ pub fn process_image(
     let new_filename = format!("{}.{}", file_stem, new_extension);
     let output_path = output_directory.join(new_filename);
 
+    create_dir_all(output_directory)?;
     resized_img.save(&output_path)?;
 
     let save_duration = save_start.elapsed();
