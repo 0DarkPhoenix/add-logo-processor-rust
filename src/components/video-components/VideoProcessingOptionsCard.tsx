@@ -11,16 +11,18 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { imageFormats } from "@/schema/imageForm";
-import type { ImageSettings } from "@/types/ImageSettings";
+import { videoCodecs, videoFormats } from "@/schema/videoForm";
+import type { VideoSettings } from "@/types/VideoSettings";
 
-export function ImageResizeDimensionsCard() {
-	const { setValue, watch } = useFormContext<ImageSettings>();
+export function VideoResizeDimensionsCard() {
+	const { setValue, watch } = useFormContext<VideoSettings>();
 	const baseId = useId();
 
 	const minPixelCount = watch("minPixelCount");
 	const shouldConvertFormat = watch("shouldConvertFormat");
 	const format = watch("format");
+	const shouldConvertCodec = watch("shouldConvertCodec");
+	const codec = watch("codec");
 
 	return (
 		<Card>
@@ -61,7 +63,7 @@ export function ImageResizeDimensionsCard() {
 						<Select
 							value={format}
 							onValueChange={(value) =>
-								setValue("format", value as ImageSettings["format"])
+								setValue("format", value as VideoSettings["format"])
 							}
 							disabled={!shouldConvertFormat}
 						>
@@ -69,9 +71,45 @@ export function ImageResizeDimensionsCard() {
 								<SelectValue placeholder='Select output format...' />
 							</SelectTrigger>
 							<SelectContent>
-								{imageFormats.map((format) => (
+								{videoFormats.map((format) => (
 									<SelectItem key={format} value={format}>
 										{format.toUpperCase()}
+									</SelectItem>
+								))}
+							</SelectContent>
+						</Select>
+					</div>
+				</div>
+
+				{/* Codec Conversion Section */}
+				<div className='space-y-4'>
+					<div className='flex items-center space-x-2'>
+						<Switch
+							id={`${baseId}-shouldConvertCodec`}
+							checked={shouldConvertCodec}
+							onCheckedChange={(checked) => setValue("shouldConvertCodec", checked)}
+							label='Convert codec'
+						/>
+					</div>
+
+					<div>
+						<Label htmlFor={`${baseId}-codec`} className='text-sm font-medium'>
+							Output Codec
+						</Label>
+						<Select
+							value={codec}
+							onValueChange={(value) =>
+								setValue("codec", value as VideoSettings["codec"])
+							}
+							disabled={!shouldConvertCodec}
+						>
+							<SelectTrigger id={`${baseId}-codec`} className='mt-1'>
+								<SelectValue placeholder='Select output codec...' />
+							</SelectTrigger>
+							<SelectContent>
+								{videoCodecs.map((codec) => (
+									<SelectItem key={codec} value={codec}>
+										{codec.toUpperCase()}
 									</SelectItem>
 								))}
 							</SelectContent>

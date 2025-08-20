@@ -32,7 +32,7 @@ export function LogoConfiguratorCard() {
 						id={`${baseId}-addLogo`}
 						checked={addLogo}
 						onCheckedChange={(checked) => setValue("addLogo", checked)}
-						label='Add logo to images'
+						label='Add logo'
 					/>
 				</div>
 

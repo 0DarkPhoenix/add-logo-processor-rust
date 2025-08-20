@@ -7,6 +7,7 @@ use tauri::{AppHandle, Manager};
 use ts_rs::TS;
 
 use crate::media::image::{get_image_format_string, image_format_strings};
+use crate::media::video::{video_codec_strings, video_format_strings};
 use crate::media::Corner;
 
 /// Custom serialization for `PathBuf`
@@ -177,14 +178,17 @@ pub struct VideoSettings {
     pub logo_corner: Corner,
     pub should_convert_format: bool,
 
-    #[serde(
-        serialize_with = "serialize_image_format",
-        deserialize_with = "deserialize_image_format"
-    )]
     #[ts(
-        type = "\"png\" | \"jpeg\" | \"webp\" | \"bmp\" | \"gif\" | \"tiff\" | \"ico\" | \"pnm\" | \"tga\" | \"hdr\" | \"exr\" | \"ff\" | \"avif\" | \"qoi\""
+        type = "\"3g2\" | \"3gp\" | \"a64\" | \"adts\" | \"amv\" | \"asf\" | \"avi\" | \"avif\" | \"swf\" | \"txt\" | \"crc\" | \"mpd\" | \"vob\" | \"f4v\" | \"fifo\" | \"flv\" | \"hash\" | \"md5\" | \"gif\" | \"f4m\" | \"m3u8\" | \"jpg\" | \"m4v\" | \"ismv\" | \"latm\" | \"mkv\" | \"mov\" | \"mp2\" | \"mp4\" | \"mpg\" | \"m1v\" | \"m2v\" | \"ts\" | \"mjpg\" | \"mxf\" | \"null\" | \"oga\" | \"ogv\" | \"opus\" | \"rtp\" | \"rtsp\" | \"sap\" | \"sdl\" | \"ism\" | \"spx\" | \"tee\" | \"ttml\" | \"webm\" | \"webp\""
     )]
-    pub format: ImageFormat,
+    pub format: String,
+
+    pub should_convert_codec: bool,
+
+    #[ts(
+        type = "\"a64_multi\" | \"a64_multi5\" | \"alias_pix\" | \"amv\" | \"apng\" | \"asv1\" | \"asv2\" | \"av1\" | \"avrp\" | \"avui\" | \"ayuv\" | \"bitpacked\" | \"bmp\" | \"cfhd\" | \"cinepak\" | \"cljr\" | \"dnxhd\" | \"dpx\" | \"dvvideo\" | \"exr\" | \"ffv1\" | \"ffvhuff\" | \"fits\" | \"flashsv\" | \"flashsv2\" | \"flv1\" | \"gif\" | \"h261\" | \"h263\" | \"h263p\" | \"h264\" | \"hdr\" | \"hevc\" | \"huffyuv\" | \"jpeg2000\" | \"jpegls\" | \"ljpeg\" | \"magicyuv\" | \"mjpeg\" | \"mpeg1video\" | \"mpeg2video\" | \"mpeg4\" | \"msmpeg4v2\" | \"msmpeg4v3\" | \"msvideo1\" | \"pam\" | \"pbm\" | \"pcx\" | \"pfm\" | \"pgm\" | \"pgmyuv\" | \"phm\" | \"png\" | \"ppm\" | \"prores\" | \"qoi\" | \"qtrle\" | \"r10k\" | \"r210\" | \"rawvideo\" | \"roq\" | \"rpza\" | \"rv10\" | \"rv20\" | \"sgi\" | \"smc\" | \"snow\" | \"speedhq\" | \"sunrast\" | \"svq1\" | \"targa\" | \"theora\" | \"tiff\" | \"utvideo\" | \"v210\" | \"v308\" | \"v408\" | \"v410\" | \"vbn\" | \"vnull\" | \"vp8\" | \"vp9\" | \"wbmp\" | \"webp\" | \"wmv1\" | \"wmv2\" | \"wrapped_avframe\" | \"xbm\" | \"xface\" | \"xwd\" | \"y41p\" | \"yuv4\" | \"zlib\" | \"zmbv\""
+    )]
+    pub codec: String,
 }
 
 impl Default for AppConfig {
@@ -221,7 +225,9 @@ impl Default for AppConfig {
                 logo_y_offset_scale: 0,
                 logo_corner: Corner::TopLeft,
                 should_convert_format: false,
-                format: ImageFormat::Png,
+                format: video_format_strings::MP4.to_string(),
+                should_convert_codec: false,
+                codec: video_codec_strings::H264.to_string(),
                 clear_files_input_directory: false,
                 clear_files_output_directory: false,
                 overwrite_existing_files_output_directory: false,

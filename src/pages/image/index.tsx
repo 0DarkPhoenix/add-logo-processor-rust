@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { invoke } from "@tauri-apps/api/core";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
-import { ResizeDimensionsCard } from "@/components/image-components/ImageProcessingOptionsCard";
+import { ImageResizeDimensionsCard } from "@/components/image-components/ImageProcessingOptionsCard";
 import { LogoConfiguratorCard } from "@/components/shared/LogoConfiguratorCard";
 import { Button } from "@/components/ui/button";
 import type { AppConfig } from "@/types/AppConfig";
@@ -54,7 +54,6 @@ export default function ImageProcessingPage() {
 	}, [form]);
 
 	const onSubmit = (data: ImageSettings) => {
-		console.log("Form submitted:", data);
 		invoke("process_images", { imageSettings: data });
 	};
 
@@ -68,7 +67,7 @@ export default function ImageProcessingPage() {
 					>
 						<DirectorySelectionCard />
 
-						<ResizeDimensionsCard />
+						<ImageResizeDimensionsCard />
 
 						<LogoConfiguratorCard />
 

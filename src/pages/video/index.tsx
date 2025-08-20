@@ -1,21 +1,81 @@
+import { zodResolver } from "@hookform/resolvers/zod";
+import { invoke } from "@tauri-apps/api/core";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { LogoConfiguratorCard } from "@/components/shared/LogoConfiguratorCard";
+import { Button } from "@/components/ui/button";
+import { VideoResizeDimensionsCard } from "@/components/video-components/VideoProcessingOptionsCard";
+import type { AppConfig } from "@/types/AppConfig";
 import { AppLayout } from "../../components/layout/AppLayout";
-import { Button } from "../../components/ui/button";
+import { DirectorySelectionCard } from "../../components/shared/DirectorySelectionCard";
+import { Form } from "../../components/ui/form";
+import { logoCorners, videoFormats, videoFormSchema } from "../../schema/videoForm";
+import type { VideoSettings } from "../../types/VideoSettings";
 
 export default function VideoProcessingPage() {
+	const form = useForm<VideoSettings>({
+		resolver: zodResolver(videoFormSchema),
+		defaultValues: {
+			inputDirectory: "",
+			outputDirectory: "",
+			searchChildFolders: false,
+			keepChildFoldersStructureInOutputDirectory: false,
+			minPixelCount: 1,
+			addLogo: false,
+			logoPath: null,
+			logoScale: 10,
+			logoXOffsetScale: 0,
+			logoYOffsetScale: 0,
+			logoCorner: logoCorners[0],
+			shouldConvertFormat: false,
+			format: videoFormats[0],
+			clearFilesInputDirectory: false,
+			clearFilesOutputDirectory: false,
+			overwriteExistingFilesOutputDirectory: false,
+		},
+	});
+
+	// Load config on component mount
+	useEffect(() => {
+		const loadConfig = async () => {
+			try {
+				const config: AppConfig = await invoke("load_config");
+				// Reset form with config values, keeping the current form structure
+				form.reset({
+					...form.getValues(),
+					...config.videoSettings,
+				});
+			} catch (error) {
+				console.error("Failed to load config:", error);
+			}
+		};
+
+		loadConfig();
+	}, [form]);
+
+	const onSubmit = (data: VideoSettings) => {
+		invoke("process_videos", { videoSettings: data });
+	};
+
 	return (
 		<AppLayout>
-			<div className="flex-1 flex flex-col gap-6 min-w-0">
-				<div className="bg-card rounded-lg border p-6 flex-1 flex items-center justify-center">
-					<div className="text-center">
-						<h2 className="text-2xl font-semibold mb-4">Video Processing</h2>
-						<p className="text-muted-foreground mb-6">
-							Video processing functionality coming soon...
-						</p>
-						<Button variant="outline" onClick={() => window.history.back()}>
-							Go Back
+			<div className='flex-1 flex align-center gap-6 min-w-0'>
+				<Form {...form}>
+					<form
+						onSubmit={form.handleSubmit(onSubmit)}
+						className='flex justify-center gap-6 h-full'
+					>
+						<DirectorySelectionCard />
+
+						<VideoResizeDimensionsCard />
+
+						<LogoConfiguratorCard />
+
+						<Button type='submit' variant='default'>
+							Process Videos
 						</Button>
-					</div>
-				</div>
+					</form>
+				</Form>
 			</div>
 		</AppLayout>
 	);

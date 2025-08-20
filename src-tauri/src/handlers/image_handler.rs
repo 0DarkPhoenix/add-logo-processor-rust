@@ -1,6 +1,7 @@
 use rayon::prelude::*;
 use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
+use walkdir::WalkDir;
 
 use crate::media::image::get_image_format_string;
 use crate::utils::{clear_and_create_folder, get_relative_path};
@@ -232,26 +233,6 @@ fn write_to_output_directory(
     !target_output_path.exists()
 }
 
-fn write_in_output_directory(
-    path: &Path,
-    input_directory: &Path,
-    output_directory: &Path,
-    image_settings: &ImageSettings,
-) -> bool {
-    dbg!(&path, input_directory, output_directory);
-    if image_settings.overwrite_existing_files_output_directory {
-        return true;
-    }
-
-    if image_settings.keep_child_folders_structure_in_output_directory {
-        let relative_image_path = get_relative_path(input_directory, path).unwrap();
-        dbg!(&relative_image_path);
-        return !output_directory.join(relative_image_path).exists();
-    }
-
-    !output_directory.join(path.file_name().unwrap()).exists()
-}
-
 fn is_supported_image_extension(path: &Path) -> bool {
     if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
         matches!(
@@ -284,8 +265,6 @@ fn read_images_recursive_parallel(
     output_directory: &Path,
     image_settings: &ImageSettings,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    use walkdir::WalkDir;
-
     let walkdir_paths = WalkDir::new(directory).into_iter().filter_map(|entry| {
         let entry = entry.ok()?;
         let path = entry.path();
