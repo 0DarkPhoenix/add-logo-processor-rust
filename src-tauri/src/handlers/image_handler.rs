@@ -38,6 +38,12 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
     )?;
     println!("Reading images took: {:?}", read_images_time.elapsed());
 
+    if image_list.is_empty() {
+        println!("No images found in the input directory, returning early.");
+        println!("Total time: {:?}", start_time.elapsed());
+        return Ok(());
+    }
+
     let sort_start = std::time::Instant::now();
     sort_list_by_file_size(&mut image_list);
     println!(

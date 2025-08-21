@@ -37,6 +37,12 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
     )?;
     println!("Reading videos took: {:?}", read_videos_time.elapsed());
 
+    if video_list.is_empty() {
+        println!("No videos found in the input directory, returning early.");
+        println!("Total time: {:?}", start_time.elapsed());
+        return Ok(());
+    }
+
     let sort_start = std::time::Instant::now();
     sort_list_by_file_size(&mut video_list);
     println!(
@@ -78,9 +84,14 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
 
 /// Apply the video settings per video in parallel
 fn apply_video_settings_per_video(video_settings: &VideoSettings, video_list: &mut Vec<Video>) {
+    let format = &video_settings.format;
+    let codec = &video_settings.codec;
+    let min_pixel_count = video_settings.min_pixel_count;
+
     video_list.par_iter_mut().for_each(|video| {
-        video.resize_dimensions(video_settings.min_pixel_count);
-        // Apply any other video-specific settings here
+        video.resize_dimensions(min_pixel_count);
+        video.file_type = format.clone();
+        video.codec = codec.clone();
     });
 }
 

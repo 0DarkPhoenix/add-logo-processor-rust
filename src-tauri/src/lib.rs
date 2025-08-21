@@ -1,3 +1,4 @@
+use ffmpeg_sidecar::download::auto_download;
 use tauri::{AppHandle, Manager};
 // Re-export types for ts-rs
 pub use media::Corner;
@@ -27,6 +28,9 @@ pub fn run() {
             app.manage(AppState {
                 app_handle: app.handle().clone(),
             });
+
+            // Download FFmpeg if not already downloaded
+            auto_download()?;
 
             Ok(())
         })

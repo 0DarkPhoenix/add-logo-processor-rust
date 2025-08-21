@@ -4,7 +4,6 @@ use crate::{
 };
 
 use super::types::Resolution;
-use ffmpeg_sidecar::download::auto_download;
 use serde::{Deserialize, Serialize};
 use std::{error::Error, path::PathBuf};
 
@@ -169,9 +168,6 @@ pub struct Video {
 
 impl Video {
     pub fn new(path: PathBuf) -> Result<Self, Box<dyn Error>> {
-        // Auto-download ffmpeg if not available
-        auto_download()?;
-
         let file_size = read_file_size(&path)?;
 
         // Get file type from extension and validate it's supported by FFmpeg
