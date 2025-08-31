@@ -1,59 +1,23 @@
+use crate::{
+    formats::image_format_types::{image_format, IMAGE_FORMAT_REGISTRY},
+    utils::{read_file_size, read_file_type},
+};
+use ffmpeg_sidecar::{child::FfmpegChild, command::FfmpegCommand, event::FfmpegEvent};
 use std::{
     error::Error,
     path::{Path, PathBuf},
 };
 
-use crate::utils::{read_file_size, read_file_type};
-
 use super::media::Media;
 use super::types::Resolution;
-use fast_image_resize::{self as fr, FilterType, ResizeAlg};
-use image::{DynamicImage, ImageFormat, ImageReader, RgbaImage};
 use serde::{Deserialize, Serialize};
-
-pub mod image_format_strings {
-    pub const PNG: &str = "png";
-    pub const JPEG: &str = "jpeg";
-    pub const WEBP: &str = "webp";
-    pub const BMP: &str = "bmp";
-    pub const GIF: &str = "gif";
-    pub const TIFF: &str = "tiff";
-    pub const ICO: &str = "ico";
-    pub const PNM: &str = "pnm";
-    pub const TGA: &str = "tga";
-    pub const HDR: &str = "hdr";
-    pub const EXR: &str = "exr";
-    pub const FF: &str = "ff";
-    pub const AVIF: &str = "avif";
-    pub const QOI: &str = "qoi";
-}
-
-pub fn get_image_format_string(format: &ImageFormat) -> &'static str {
-    (match format {
-        ImageFormat::Png => image_format_strings::PNG,
-        ImageFormat::Jpeg => image_format_strings::JPEG,
-        ImageFormat::WebP => image_format_strings::WEBP,
-        ImageFormat::Bmp => image_format_strings::BMP,
-        ImageFormat::Gif => image_format_strings::GIF,
-        ImageFormat::Tiff => image_format_strings::TIFF,
-        ImageFormat::Ico => image_format_strings::ICO,
-        ImageFormat::Pnm => image_format_strings::PNM,
-        ImageFormat::Tga => image_format_strings::TGA,
-        ImageFormat::Hdr => image_format_strings::HDR,
-        ImageFormat::OpenExr => image_format_strings::EXR,
-        ImageFormat::Farbfeld => image_format_strings::FF,
-        ImageFormat::Avif => image_format_strings::AVIF,
-        ImageFormat::Qoi => image_format_strings::QOI,
-        _ => image_format_strings::PNG, // default fallback
-    }) as _
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Image {
     pub file_path: PathBuf,
     pub resolution: Resolution,
     pub file_size: u64,
-    pub file_type: ImageFormat,
+    pub file_type: String,
 }
 
 impl Image {
@@ -61,7 +25,7 @@ impl Image {
         // Get file size
         let file_size = read_file_size(&file_path)?;
 
-        // Get file type from extension
+        // Get file type from extension and validate it's supported by FFmpeg
         let file_type = read_image_file_type(&file_path)?;
 
         // Read image dimensions
@@ -77,7 +41,7 @@ impl Image {
 }
 
 impl Media for Image {
-    type FileType = ImageFormat;
+    type FileType = String;
 
     fn get_resolution(&self) -> &Resolution {
         &self.resolution
@@ -96,167 +60,171 @@ impl Media for Image {
     }
 }
 
-/// Read the image file type, and maps it to a `ImageFormat` enum used by the `image` crate.
-fn read_image_file_type(file_path: &Path) -> Result<ImageFormat, Box<dyn Error>> {
+/// Read the image file type and validate it's supported by FFmpeg
+fn read_image_file_type(file_path: &Path) -> Result<String, Box<dyn Error>> {
     let file_type = read_file_type(file_path);
 
-    let format = ImageFormat::from_extension(&file_type)
-        .ok_or_else(|| format!("Unsupported image format: {}", file_type))?;
-    Ok(format)
-}
-
-pub fn load_image(path: &PathBuf) -> Result<DynamicImage, Box<dyn Error>> {
-    let img = image::open(path)?;
-    Ok(img)
-}
-
-pub fn read_image_resolution(path: &PathBuf) -> Result<Resolution, Box<dyn Error>> {
-    let reader = ImageReader::open(path)?;
-    let dimensions = reader.into_dimensions()?;
-    let resolution = Resolution {
-        width: dimensions.0,
-        height: dimensions.1,
-    };
-    Ok(resolution)
-}
-
-pub fn resize_image(img: DynamicImage, image: &Image) -> Result<DynamicImage, Box<dyn Error>> {
-    let resolution = &image.resolution;
-
-    if let Some(ico_image) = handle_resize_to_ico_format(&img, image, resolution) {
-        return ico_image;
+    if IMAGE_FORMAT_REGISTRY.is_supported_for_reading(file_type.as_str()) {
+        Ok(file_type)
+    } else {
+        Err(format!("Unsupported image format for reading: {}", file_type).into())
     }
-
-    let original_width = img.width();
-    let original_height = img.height();
-    let target_width = resolution.width;
-    let target_height = resolution.height;
-
-    // If no resizing is needed, return the original image
-    if original_width == target_width && original_height == target_height {
-        return Ok(img);
-    }
-
-    // Convert DynamicImage to RGBA8 for fast_image_resize
-    let rgba_img = img.to_rgba8();
-
-    // Create source image for fast_image_resize
-    let src_image = fr::images::Image::from_vec_u8(
-        original_width,
-        original_height,
-        rgba_img.into_raw(),
-        fr::PixelType::U8x4,
-    )?;
-
-    // Create destination image
-    let mut dst_image = fr::images::Image::new(target_width, target_height, fr::PixelType::U8x4);
-
-    // Create resizer with high-quality algorithm
-    let mut resizer = fr::Resizer::new();
-
-    // Perform the resize with CatmullRom filter
-    let resize_options =
-        fr::ResizeOptions::new().resize_alg(ResizeAlg::Interpolation(FilterType::CatmullRom));
-
-    resizer.resize(&src_image, &mut dst_image, &resize_options)?;
-
-    // Convert back to DynamicImage
-    let resized_rgba = RgbaImage::from_raw(target_width, target_height, dst_image.into_vec())
-        .ok_or("Failed to create RgbaImage from resized data")?;
-
-    Ok(DynamicImage::ImageRgba8(resized_rgba))
 }
 
-/// Handle resizing an image while it is an ICO format, as this format supports a maximum size of 256x256 pixels.
-fn handle_resize_to_ico_format(
-    img: &DynamicImage,
-    image: &Image,
-    resolution: &Resolution,
-) -> Option<Result<DynamicImage, Box<dyn Error>>> {
-    if image.file_type == ImageFormat::Ico {
-        // ICO format maximum size is 256x256, preserve aspect ratio
-        let max_dimension = resolution.width.max(resolution.height);
+pub fn read_image_resolution(path: &Path) -> Result<Resolution, Box<dyn Error>> {
+    let dimensions =
+        imagesize::size(path).map_err(|e| format!("Failed to read image dimensions: {}", e))?;
 
-        if max_dimension > 256 {
-            // Scale down proportionally to fit within 256x256
-            let scale_factor = 256.0 / max_dimension as f32;
-            let width = (resolution.width as f32 * scale_factor) as u32;
-            let height = (resolution.height as f32 * scale_factor) as u32;
+    Ok(Resolution {
+        width: dimensions.width as u32,
+        height: dimensions.height as u32,
+    })
+}
 
-            // Use fast_image_resize for ICO format as well for consistency
-            let rgba_img = img.to_rgba8();
+/// Apply image format specific arguments to the FFmpeg command
+pub fn apply_image_format_specific_args(image_format: &str, cmd: &mut FfmpegCommand) {
+    // Add general performance improvements
+    cmd.args([
+        "-preset", "fast", // Faster encoding preset
+    ]);
 
-            if let Ok(src_image) = fr::images::Image::from_vec_u8(
-                img.width(),
-                img.height(),
-                rgba_img.into_raw(),
-                fr::PixelType::U8x4,
-            ) {
-                let mut dst_image = fr::images::Image::new(width, height, fr::PixelType::U8x4);
-                let mut resizer = fr::Resizer::new();
-
-                // Perform the resize with CatmullRom filter
-                let resize_options = fr::ResizeOptions::new()
-                    .resize_alg(ResizeAlg::Interpolation(fr::FilterType::CatmullRom));
-
-                if resizer
-                    .resize(&src_image, &mut dst_image, &resize_options)
-                    .is_ok()
-                {
-                    if let Some(resized_rgba) =
-                        RgbaImage::from_raw(width, height, dst_image.into_vec())
-                    {
-                        return Some(Ok(DynamicImage::ImageRgba8(resized_rgba)));
-                    }
-                }
-            }
-
-            // Fallback to original method if fast_image_resize fails
-            let resized = img.resize_exact(width, height, image::imageops::FilterType::Lanczos3);
-            return Some(Ok(resized));
-        } else {
-            // Image is already within limits, use original dimensions
-            let rgba_img = img.to_rgba8();
-
-            if let Ok(src_image) = fr::images::Image::from_vec_u8(
-                img.width(),
-                img.height(),
-                rgba_img.into_raw(),
-                fr::PixelType::U8x4,
-            ) {
-                let mut dst_image = fr::images::Image::new(
-                    resolution.width,
-                    resolution.height,
-                    fr::PixelType::U8x4,
-                );
-                let mut resizer = fr::Resizer::new();
-
-                // Perform the resize with CatmullRom filter
-                let resize_options = fr::ResizeOptions::new()
-                    .resize_alg(ResizeAlg::Interpolation(fr::FilterType::CatmullRom));
-
-                if resizer
-                    .resize(&src_image, &mut dst_image, &resize_options)
-                    .is_ok()
-                {
-                    if let Some(resized_rgba) = RgbaImage::from_raw(
-                        resolution.width,
-                        resolution.height,
-                        dst_image.into_vec(),
-                    ) {
-                        return Some(Ok(DynamicImage::ImageRgba8(resized_rgba)));
-                    }
-                }
-            }
-
-            // Fallback to original method if fast_image_resize fails
-            let resized = img.resize_exact(
-                resolution.width,
-                resolution.height,
-                image::imageops::FilterType::Lanczos3,
-            );
-            return Some(Ok(resized));
+    match image_format {
+        name if image_format::PNG.extensions.contains(&name) => {
+            cmd.args([
+                "-pix_fmt",
+                "rgba",
+                "-compression_level",
+                "1",
+                "-pred",
+                "sub",
+            ]);
         }
+        name if image_format::JPEG.extensions.contains(&name) => {
+            cmd.args([
+                "-pix_fmt", "yuv420p", // Standard format, faster than yuvj420p
+                "-q:v", "3", // High enough quality while maintaining performance
+                "-huffman", "0", // Use default huffman tables (faster than optimal (1))
+            ]);
+        }
+        name if image_format::WEBP.extensions.contains(&name) => {
+            cmd.args([
+                "-quality", "75", // Slightly lower quality for better performance
+                "-pix_fmt", "yuva420p", "-preset", "default", "-method",
+                "2", // Compression method (0-6, 4 is good balance)
+            ]);
+        }
+        name if image_format::BMP.extensions.contains(&name) => {
+            cmd.args(["-pix_fmt", "bgr24"]);
+        }
+        name if image_format::GIF.extensions.contains(&name) => {
+            cmd.args(["-pix_fmt", "rgb8"]);
+        }
+        name if image_format::TIFF.extensions.contains(&name) => {
+            cmd.args([
+                "-pix_fmt",
+                "rgba",
+                "-compression_algo",
+                "deflate", // Good compression
+                "-pred",
+                "0", // Horizontal prediction for better compression
+            ]);
+        }
+        _ => {}
     }
-    None
+}
+
+/// Handle resizing an image to ICO format with FFmpeg
+fn handle_resize_to_ico_format(
+    input_path: &PathBuf,
+    output_path: &PathBuf,
+    resolution: &Resolution,
+) -> Result<(), Box<dyn Error>> {
+    // ICO format maximum size is 256x256, preserve aspect ratio
+    let max_dimension = resolution.width.max(resolution.height);
+
+    let (width, height) = if max_dimension > 256 {
+        // Scale down proportionally to fit within 256x256
+        let scale_factor = 256.0 / max_dimension as f32;
+        let width = (resolution.width as f32 * scale_factor) as u32;
+        let height = (resolution.height as f32 * scale_factor) as u32;
+        (width, height)
+    } else {
+        (resolution.width, resolution.height)
+    };
+
+    let ffmpeg_child = FfmpegCommand::new()
+        .args([
+            "-y", // Overwrite output file
+            "-i",
+            input_path.to_str().ok_or("Invalid input path")?,
+            "-vf",
+            &format!("scale={}:{}", width, height),
+            "-pix_fmt",
+            "bgra", // ICO format typically uses BGRA
+            "-f",
+            image_format::ICO.name,
+        ])
+        .output(output_path.to_str().ok_or("Invalid output path")?)
+        .spawn()?;
+
+    ffmpeg_logger(ffmpeg_child)?;
+
+    Ok(())
+}
+
+pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error>> {
+    let mut error_messages = Vec::new();
+    let mut log_messages = Vec::new();
+    ffmpeg_child.iter()?.for_each(|event| {
+        match event {
+            FfmpegEvent::Log(log_level, message) => {
+                log_messages.push(format!("{:?}: {}", log_level, message));
+                // Collect error and warning messages
+                match log_level {
+                    ffmpeg_sidecar::event::LogLevel::Error
+                    | ffmpeg_sidecar::event::LogLevel::Fatal => {
+                        error_messages.push(message);
+                    }
+                    _ => {}
+                }
+            }
+            FfmpegEvent::Error(error) => {
+                error_messages.push(error);
+            }
+            // FfmpegEvent::Progress(progress) => {
+            //     // Optionally log progress for images (though it's usually very fast)
+            //     println!(
+            //         "Progress: frame={}, fps={}, time={}",
+            //         progress.frame, progress.fps, progress.time
+            //     );
+            // }
+            FfmpegEvent::Done => {
+                println!("FFmpeg image processing completed successfully");
+            }
+            _ => {
+                // Handle other events if needed
+            }
+        }
+    });
+    let output = ffmpeg_child.wait()?;
+    let _: () = if !output.success() {
+        let error_message = if !error_messages.is_empty() {
+            format!(
+                "FFmpeg command failed with exit code: {:?}\n\nErrors:\n{}",
+                output.code(),
+                error_messages.join("\n")
+            )
+        } else if !log_messages.is_empty() {
+            format!(
+                "FFmpeg command failed with exit code: {:?}\n\nLogs:\n{}",
+                output.code(),
+                log_messages.join("\n")
+            )
+        } else {
+            format!("FFmpeg command failed with exit code: {:?}", output.code())
+        };
+
+        return Err(error_message.into());
+    };
+    Ok(())
 }

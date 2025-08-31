@@ -84,14 +84,10 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
 
 /// Apply the video settings per video in parallel
 fn apply_video_settings_per_video(video_settings: &VideoSettings, video_list: &mut Vec<Video>) {
-    let format = &video_settings.format;
-    let codec = &video_settings.codec;
-    let min_pixel_count = video_settings.min_pixel_count;
-
     video_list.par_iter_mut().for_each(|video| {
-        video.resize_dimensions(min_pixel_count);
-        video.file_type = format.clone();
-        video.codec = codec.clone();
+        video.resize_dimensions(&video_settings.min_pixel_count);
+        video.file_type = video_settings.format.clone();
+        video.codec = video_settings.codec.clone();
     });
 }
 

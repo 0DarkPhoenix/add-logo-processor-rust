@@ -18,15 +18,23 @@
     tauri-build= {version="2", features= [] }
     ts-rs      ="11.0"
 
+[profile.release]
+    debug    =1
+    lto      =true
+    opt-level="s"
+
 [dependencies]
-    fast_image_resize  ="5.2.1"
     ffmpeg-sidecar     ="2.1"
-    image              = {version="0.25", features= ["serde"] }
+imagesize = "0.14.0"
+lazy_static = "1.5.0"
+    log                ="0.4"
+    num_cpus           ="1.17"
     rayon              ="1.11"
     serde              = {version="1", features= ["derive"] }
     serde_json         ="1"
     tauri              = {version="2", features= [] }
     tauri-plugin-dialog="2"
+    tauri-plugin-log   ="2"
     tauri-plugin-opener="2"
     ts-rs              ="11.0"
-walkdir = "2.5.0"
+    walkdir            ="2.5.0"

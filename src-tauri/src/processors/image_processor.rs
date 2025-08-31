@@ -1,136 +1,108 @@
-use crate::media::image::{load_image, resize_image};
-use crate::media::Image;
-use crate::media::{image::get_image_format_string, Logo};
-use image::ImageFormat;
-use image::{DynamicImage, ImageReader};
-use std::fs::create_dir_all;
+use crate::media::image::{apply_image_format_specific_args, ffmpeg_logger};
+use crate::media::{Image, Logo};
+use ffmpeg_sidecar::command::FfmpegCommand;
+use log::info;
+use std::error::Error;
+use std::path::PathBuf;
 use std::time::Instant;
-use std::{error::Error, path::Path};
 
-pub fn process_image(
-    image: &Image,
+pub fn process_image_batch(
+    batch_data: &[(Image, PathBuf)], // (Image, output_directory)
     logo: Option<&Logo>,
-    output_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
+    if batch_data.is_empty() {
+        return Ok(());
+    }
+
     let start_time = Instant::now();
 
-    let load_start = Instant::now();
-    let img = load_image(&image.file_path)?;
-    let load_duration = load_start.elapsed();
-    println!("Image load time: {:?}", load_duration);
+    // All images in a batch should have the same resolution and file type
+    let first_image = &batch_data[0].0;
+    let target_resolution = &first_image.resolution;
+    let target_file_type = &first_image.file_type;
 
-    let resize_start = Instant::now();
-    let mut resized_img = resize_image(img, image)?;
-    let resize_duration = resize_start.elapsed();
-    println!("Image resize time: {:?}", resize_duration);
+    info!(
+        "Processing batch of {} images with resolution {}x{} and format {}",
+        batch_data.len(),
+        target_resolution.width,
+        target_resolution.height,
+        target_file_type
+    );
 
-    let conversion_start = Instant::now();
-    check_for_rgb_conversion(&mut resized_img, &image.file_type);
-    let conversion_duration = conversion_start.elapsed();
-    println!("Color conversion time: {:?}", conversion_duration);
-
-    let logo_start = Instant::now();
-    if let Some(logo) = logo {
-        apply_logo_to_image(&mut resized_img, logo)?
-    }
-    let logo_duration = logo_start.elapsed();
-    if logo.is_some() {
-        println!("Logo application time: {:?}", logo_duration);
+    // Create output directories for all images first
+    for (_, output_directory) in batch_data {
+        std::fs::create_dir_all(output_directory)?;
     }
 
-    let save_start = Instant::now();
-    let file_stem = image
-        .file_path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .ok_or("Invalid file name")?;
-
-    let new_extension = get_image_format_string(&image.file_type);
-    let new_filename = format!("{}.{}", file_stem, new_extension);
-    let output_path = output_directory.join(new_filename);
-
-    create_dir_all(output_directory)?;
-    resized_img.save(&output_path)?;
-
-    let save_duration = save_start.elapsed();
-    println!("Image save time: {:?}", save_duration);
-
-    let total_duration = start_time.elapsed();
-    println!(
-        "Total image processing time for '{}': {:?}",
-        image
+    // Process each image individually to avoid complex filter issues
+    for (i, (image, output_directory)) in batch_data.iter().enumerate() {
+        let file_stem = image
             .file_path
-            .file_name()
-            .unwrap_or_default()
-            .to_string_lossy(),
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or("Invalid file name")?;
+
+        let new_filename = format!("{}.{}", file_stem, target_file_type);
+        let output_file = output_directory.join(new_filename);
+
+        // Start building the ffmpeg command for this individual image
+        let mut cmd = FfmpegCommand::new();
+
+        // Hide command window on Windows
+        #[cfg(target_os = "windows")]
+        cmd.hide_banner();
+
+        // Add optimization flags first
+        cmd.args([
+            "-y", // Overwrite output file
+            "-threads",
+            "0",   // Use all available CPU cores
+            "-an", // No audio processing
+            "-vsync",
+            "0", // Disable video sync (not needed for single images)
+            "-frame_drop_threshold",
+            "0", // Don't drop frames
+        ]);
+
+        // Add input image
+        cmd.input(image.file_path.to_str().ok_or("Invalid image file path")?);
+
+        if let Some(logo) = logo {
+            // Add logo input image
+            cmd.input(logo.file_path.to_str().ok_or("Invalid logo file path")?);
+
+            // Scale image and overlay logo with optimized scaling
+            let filter = format!(
+                "[0:v]scale={}:{}:flags=fast_bilinear[scaled];[scaled][1:v]overlay={}:{}",
+                target_resolution.width, target_resolution.height, logo.position.x, logo.position.y
+            );
+            cmd.args(["-filter_complex", &filter]);
+        } else {
+            // Just scale the image if no logo with optimized scaling
+            let filter = format!(
+                "scale={}:{}:flags=fast_bilinear",
+                target_resolution.width, target_resolution.height
+            );
+            cmd.args(["-vf", &filter]);
+        }
+
+        // Set output format and quality settings for the target file type
+        apply_image_format_specific_args(target_file_type, &mut cmd);
+
+        // Set output file
+        cmd.output(output_file.to_str().ok_or("Invalid output file path")?);
+
+        // Execute the command
+        let ffmpeg_child = cmd.spawn()?;
+
+        ffmpeg_logger(ffmpeg_child)?;
+    }
+    let total_duration = start_time.elapsed();
+    info!(
+        "Total batch processing time for {} images: {:?}",
+        batch_data.len(),
         total_duration
     );
 
     Ok(())
-}
-
-fn apply_logo_to_image(img: &mut DynamicImage, logo: &Logo) -> Result<(), Box<dyn Error>> {
-    let logo_load_start = Instant::now();
-    let logo_img = ImageReader::open(&logo.file_path)?.decode()?;
-    let logo_load_duration = logo_load_start.elapsed();
-    println!("  Logo load time: {:?}", logo_load_duration);
-
-    let overlay_start = Instant::now();
-    image::imageops::overlay(
-        img,
-        &logo_img,
-        logo.position.x as i64,
-        logo.position.y as i64,
-    );
-    let overlay_duration = overlay_start.elapsed();
-    println!("  Logo overlay time: {:?}", overlay_duration);
-
-    Ok(())
-}
-
-/// Check if the image needs to be converted to the correct color format for the target image format
-pub fn check_for_rgb_conversion(img: &mut DynamicImage, format: &ImageFormat) {
-    match format {
-        // Formats that require RGB8 (no alpha channel)
-        ImageFormat::Jpeg | ImageFormat::Bmp => {
-            *img = DynamicImage::ImageRgb8(img.to_rgb8());
-        }
-        // Formats that require RGB32F (floating point)
-        ImageFormat::Hdr | ImageFormat::OpenExr => {
-            *img = DynamicImage::ImageRgb32F(img.to_rgb32f());
-        }
-        // Formats that require RGBA8 (with alpha channel)
-        ImageFormat::Ico => {
-            *img = DynamicImage::ImageRgba8(img.to_rgba8());
-        }
-        // Farbfeld requires RGBA16
-        ImageFormat::Farbfeld => {
-            *img = DynamicImage::ImageRgba16(img.to_rgba16());
-        }
-        // Formats that work with various color types but benefit from RGBA8
-        ImageFormat::Png | ImageFormat::WebP | ImageFormat::Tiff | ImageFormat::Avif => {
-            // These formats support alpha, so convert to RGBA8 if not already
-            if !matches!(
-                img,
-                DynamicImage::ImageRgba8(_)
-                    | DynamicImage::ImageRgba16(_)
-                    | DynamicImage::ImageRgba32F(_)
-            ) {
-                *img = DynamicImage::ImageRgb8(img.to_rgb8());
-            }
-        }
-        // Formats that are flexible with color types - no conversion needed
-        ImageFormat::Gif
-        | ImageFormat::Pnm
-        | ImageFormat::Tga
-        | ImageFormat::Dds
-        | ImageFormat::Qoi => {
-            // These formats can handle various color types, no conversion needed
-        }
-        // Default case for any other formats
-        _ => {
-            // Convert to RGB8 as a safe default
-            *img = DynamicImage::ImageRgb8(img.to_rgb8());
-        }
-    }
 }

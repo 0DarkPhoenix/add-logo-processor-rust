@@ -1,4 +1,3 @@
-use image::ImageFormat;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::path::PathBuf;
 use std::sync::{OnceLock, RwLock};
@@ -6,7 +5,7 @@ use std::{error::Error, fs};
 use tauri::{AppHandle, Manager};
 use ts_rs::TS;
 
-use crate::media::image::{get_image_format_string, image_format_strings};
+use crate::formats::image_format_types::image_format;
 use crate::media::video::{video_codec_strings, video_format_strings};
 use crate::media::Corner;
 
@@ -46,40 +45,6 @@ where
 {
     let opt: Option<String> = Option::deserialize(deserializer)?;
     Ok(opt.map(PathBuf::from))
-}
-
-/// Custom serialization for `ImageFormat`
-fn serialize_image_format<S>(format: &ImageFormat, serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let format_str = get_image_format_string(format);
-    format_str.serialize(serializer)
-}
-
-/// Custom deserialization for `ImageFormat`
-fn deserialize_image_format<'de, D>(deserializer: D) -> Result<ImageFormat, D::Error>
-where
-    D: Deserializer<'de>,
-{
-    let s = String::deserialize(deserializer)?;
-    match s.as_str() {
-        image_format_strings::PNG => Ok(ImageFormat::Png),
-        image_format_strings::JPEG => Ok(ImageFormat::Jpeg),
-        image_format_strings::WEBP => Ok(ImageFormat::WebP),
-        image_format_strings::BMP => Ok(ImageFormat::Bmp),
-        image_format_strings::GIF => Ok(ImageFormat::Gif),
-        image_format_strings::TIFF => Ok(ImageFormat::Tiff),
-        image_format_strings::ICO => Ok(ImageFormat::Ico),
-        image_format_strings::PNM => Ok(ImageFormat::Pnm),
-        image_format_strings::TGA => Ok(ImageFormat::Tga),
-        image_format_strings::HDR => Ok(ImageFormat::Hdr),
-        image_format_strings::EXR => Ok(ImageFormat::OpenExr),
-        image_format_strings::FF => Ok(ImageFormat::Farbfeld),
-        image_format_strings::AVIF => Ok(ImageFormat::Avif),
-        image_format_strings::QOI => Ok(ImageFormat::Qoi),
-        _ => Ok(ImageFormat::Png), // default fallback
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -128,15 +93,10 @@ pub struct ImageSettings {
     pub logo_y_offset_scale: i32,
     pub logo_corner: Corner,
     pub should_convert_format: bool,
-
-    #[serde(
-        serialize_with = "serialize_image_format",
-        deserialize_with = "deserialize_image_format"
-    )]
     #[ts(
         type = "\"png\" | \"jpeg\" | \"webp\" | \"bmp\" | \"gif\" | \"tiff\" | \"ico\" | \"pnm\" | \"tga\" | \"hdr\" | \"exr\" | \"ff\" | \"avif\" | \"qoi\""
     )]
-    pub format: ImageFormat,
+    pub format: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -207,7 +167,7 @@ impl Default for AppConfig {
                 logo_y_offset_scale: 0,
                 logo_corner: Corner::TopLeft,
                 should_convert_format: false,
-                format: ImageFormat::Png,
+                format: image_format::PNG.extensions[0].to_string(),
                 clear_files_input_directory: false,
                 clear_files_output_directory: false,
                 overwrite_existing_files_output_directory: false,

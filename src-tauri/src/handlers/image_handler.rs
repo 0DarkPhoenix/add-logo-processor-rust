@@ -1,14 +1,15 @@
+use log::{error, info};
 use rayon::prelude::*;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
 use walkdir::WalkDir;
 
-use crate::media::image::get_image_format_string;
 use crate::utils::{clear_and_create_folder, get_relative_path};
 use crate::{
     handlers::handle_logos,
     media::{Image, Logo, Media, Resolution},
-    processors::process_image,
+    processors::process_image_batch,
     utils::config::ImageSettings,
 };
 
@@ -23,7 +24,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
     if image_settings.clear_files_output_directory || !output_directory.exists() {
         let clear_folder_time = std::time::Instant::now();
         clear_and_create_folder(output_directory).unwrap();
-        println!(
+        info!(
             "Clearing and creating output directory took: {:?}",
             clear_folder_time.elapsed()
         );
@@ -36,31 +37,31 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         &mut image_list,
         output_directory,
     )?;
-    println!("Reading images took: {:?}", read_images_time.elapsed());
+    info!("Reading images took: {:?}", read_images_time.elapsed());
 
     if image_list.is_empty() {
-        println!("No images found in the input directory, returning early.");
-        println!("Total time: {:?}", start_time.elapsed());
+        info!("No images found in the input directory, returning early.");
+        info!("Total time: {:?}", start_time.elapsed());
         return Ok(());
     }
 
     let sort_start = std::time::Instant::now();
     sort_list_by_file_size(&mut image_list);
-    println!(
+    info!(
         "Sorting images by file size took: {:?}",
         sort_start.elapsed()
     );
 
     let apply_settings_start = std::time::Instant::now();
     apply_image_settings_per_image(image_settings, &mut image_list);
-    println!(
+    info!(
         "Applying image settings took: {:?}",
         apply_settings_start.elapsed()
     );
 
     let logo_processing_start = std::time::Instant::now();
     let logo_list = process_logos_for_image_resolutions(image_settings, &image_list)?;
-    println!(
+    info!(
         "Processing logos took: {:?}",
         logo_processing_start.elapsed()
     );
@@ -73,12 +74,12 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         image_settings,
         input_directory,
     )?;
-    println!(
+    info!(
         "Processing images took: {:?}",
         image_processing_start.elapsed()
     );
 
-    println!("Total time: {:?}", start_time.elapsed());
+    info!("Total time: {:?}", start_time.elapsed());
 
     Ok(())
 }
@@ -86,12 +87,18 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 /// Apply the image settings per image in parallel
 fn apply_image_settings_per_image(image_settings: &ImageSettings, image_list: &mut Vec<Image>) {
     image_list.par_iter_mut().for_each(|image| {
-        image.resize_dimensions(image_settings.min_pixel_count);
-        image.file_type = image_settings.format;
+        image.resize_dimensions(&image_settings.min_pixel_count);
+        image.file_type = image_settings.format.clone();
     });
 }
 
-/// Process the images from the image list in parallel
+#[derive(Hash, Eq, PartialEq, Clone)]
+struct BatchKey {
+    resolution: Resolution,
+    file_type: String,
+}
+
+/// Process the images from the image list in batches sequentially by size
 fn process_images_from_image_list(
     output_directory: &Path,
     image_list: Vec<Image>,
@@ -99,13 +106,57 @@ fn process_images_from_image_list(
     image_settings: &ImageSettings,
     input_directory: &Path,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    image_list
-        .par_iter()
-        .try_for_each(|image| -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Group images by resolution and file type to create initial batches
+    let mut batches: HashMap<BatchKey, Vec<Image>> = HashMap::new();
+
+    for image in image_list {
+        let key = BatchKey {
+            resolution: image.resolution.clone(),
+            file_type: image.file_type.clone(),
+        };
+        batches.entry(key).or_default().push(image);
+    }
+
+    info!("Created {} initial batches for processing", batches.len());
+
+    // Print batch sizes for debugging
+    for (key, images) in &batches {
+        info!(
+            "Batch {}x{} ({}): {} images",
+            key.resolution.width,
+            key.resolution.height,
+            key.file_type,
+            images.len()
+        );
+    }
+
+    // Calculate optimal number of threads
+    let cpu_count = num_cpus::get();
+    let total_images = batches.values().map(|v| v.len()).sum::<usize>();
+
+    // Use more threads for larger workloads
+    let optimal_threads = (cpu_count as f64 * 1.5) as usize;
+
+    info!(
+        "Using {} threads for {} total images",
+        optimal_threads, total_images
+    );
+
+    // Split large batches to better utilize threads
+    let work_units = split_batches_optimally(batches, optimal_threads);
+
+    info!(
+        "Split into {} work units for optimal thread utilization",
+        work_units.len()
+    );
+
+    // Process work units in parallel
+    work_units.into_par_iter().try_for_each(
+        |(batch_key, images)| -> Result<(), Box<dyn Error + Send + Sync>> {
             let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
                 logo_list
                     .iter()
-                    .find(|logo| logo.compatible_image_resolution == image.resolution)
+                    .find(|logo| logo.compatible_image_resolution == batch_key.resolution)
             } else {
                 None
             };
@@ -113,30 +164,121 @@ fn process_images_from_image_list(
             if logo.is_none() && logo_list.is_some() {
                 return Err(format!(
                     "No logo found for the given image resolution: {}",
-                    image.resolution
+                    batch_key.resolution
                 )
                 .into());
             }
 
-            let final_output_directory =
-                if image_settings.keep_child_folders_structure_in_output_directory {
-                    let relative_image_path = get_relative_path(input_directory, &image.file_path)
-                        .map_err(|e| -> Box<dyn Error + Send + Sync> {
-                            format!("Failed to get relative path: {}", e).into()
-                        })?;
-                    let relative_dir_path = relative_image_path.parent().unwrap_or(Path::new(""));
-                    output_directory.join(relative_dir_path)
-                } else {
-                    output_directory.to_path_buf()
-                };
+            // Prepare batch data with output directories
+            let batch_data: Vec<(Image, PathBuf)> = images
+                .iter()
+                .map(|image| {
+                    let final_output_directory =
+                        if image_settings.keep_child_folders_structure_in_output_directory {
+                            let relative_image_path =
+                                get_relative_path(input_directory, &image.file_path)
+                                    .unwrap_or_else(|_| PathBuf::from(""));
+                            let relative_dir_path =
+                                relative_image_path.parent().unwrap_or(Path::new(""));
+                            output_directory.join(relative_dir_path)
+                        } else {
+                            output_directory.to_path_buf()
+                        };
+                    (image.clone(), final_output_directory)
+                })
+                .collect();
 
-            process_image(image, logo, &final_output_directory).map_err(
+            info!(
+                "Processing work unit with {} images ({}x{}, {})",
+                batch_data.len(),
+                batch_key.resolution.width,
+                batch_key.resolution.height,
+                batch_key.file_type
+            );
+
+            process_image_batch(&batch_data, logo).map_err(
                 |e| -> Box<dyn Error + Send + Sync> {
-                    format!("Failed to process image: {}", e).into()
+                    format!("Failed to process image batch: {}", e).into()
                 },
-            )
-        })?;
+            )?;
+
+            Ok(())
+        },
+    )?;
+
     Ok(())
+}
+
+/// Split batches optimally to utilize all available threads
+fn split_batches_optimally(
+    batches: HashMap<BatchKey, Vec<Image>>,
+    target_threads: usize,
+) -> Vec<(BatchKey, Vec<Image>)> {
+    let mut work_units = Vec::new();
+
+    // Calculate total images and target images per work unit
+    let total_images: usize = batches.values().map(|v| v.len()).sum();
+    let target_images_per_unit = total_images.div_ceil(target_threads); // Ceiling division
+
+    // Minimum batch size to avoid too many tiny batches
+    let min_batch_size = std::cmp::max(1, target_images_per_unit / 4);
+
+    info!(
+        "Target images per work unit: {}, minimum batch size: {}",
+        target_images_per_unit, min_batch_size
+    );
+
+    for (batch_key, mut images) in batches {
+        if images.len() <= target_images_per_unit {
+            // Small batch, keep as is
+            work_units.push((batch_key, images));
+        } else {
+            // Large batch, split it
+            let num_splits = images.len().div_ceil(target_images_per_unit);
+            let actual_split_size = images.len().div_ceil(num_splits);
+
+            info!(
+                "Splitting batch of {} images into {} units of ~{} images each",
+                images.len(),
+                num_splits,
+                actual_split_size
+            );
+
+            // Sort images by file size within each batch for better load balancing
+            images.sort_by(|a, b| b.file_size.cmp(&a.file_size));
+
+            // Split using round-robin to distribute large and small files evenly
+            let mut splits: Vec<Vec<Image>> = vec![Vec::new(); num_splits];
+
+            for (index, image) in images.into_iter().enumerate() {
+                splits[index % num_splits].push(image);
+            }
+
+            // Add non-empty splits to work units
+            for split in splits {
+                if !split.is_empty() && split.len() >= min_batch_size {
+                    work_units.push((batch_key.clone(), split));
+                } else if !split.is_empty() {
+                    // If split is too small, try to merge with the last work unit of the same type
+                    if let Some(last_unit) = work_units
+                        .iter_mut()
+                        .rev()
+                        .find(|(key, _)| key == &batch_key)
+                    {
+                        last_unit.1.extend(split);
+                    } else {
+                        // If no existing unit to merge with, create a new one anyway
+                        work_units.push((batch_key.clone(), split));
+                    }
+                }
+            }
+        }
+    }
+
+    // Sort work units by size (largest first) for better scheduling
+    work_units.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
+
+    work_units
 }
 
 fn process_logos_for_image_resolutions(
@@ -178,7 +320,7 @@ fn read_images_in_input_directory(
         let dir_read_start = std::time::Instant::now();
         let entries: Result<Vec<_>, _> = read_dir(input_directory)?.collect();
         let entries = entries?;
-        println!("Directory read took: {:?}", dir_read_start.elapsed());
+        info!("Directory read took: {:?}", dir_read_start.elapsed());
 
         let filter_start = std::time::Instant::now();
         let entry_paths = entries.iter().map(|entry| entry.path());
@@ -188,12 +330,12 @@ fn read_images_in_input_directory(
             output_directory,
             image_settings,
         );
-        println!("Path filtering took: {:?}", filter_start.elapsed());
-        println!("Found {} valid image paths", valid_image_paths.len());
+        info!("Path filtering took: {:?}", filter_start.elapsed());
+        info!("Found {} valid image paths", valid_image_paths.len());
 
         let image_creation_start = std::time::Instant::now();
         let images = create_images_from_paths_parallel(&valid_image_paths);
-        println!("Image creation took: {:?}", image_creation_start.elapsed());
+        info!("Image creation took: {:?}", image_creation_start.elapsed());
 
         image_list.extend(images);
     }
@@ -209,7 +351,6 @@ fn write_to_output_directory(
     output_directory: &Path,
     image_settings: &ImageSettings,
 ) -> bool {
-    dbg!(&path, input_directory, output_directory);
     if image_settings.overwrite_existing_files_output_directory {
         return true;
     }
@@ -221,7 +362,7 @@ fn write_to_output_directory(
         .unwrap_or("unknown");
 
     // Get the target extension based on the format setting
-    let target_extension = get_image_format_string(&image_settings.format);
+    let target_extension = &image_settings.format;
 
     let target_filename = format!("{}.{}", file_stem, target_extension);
 
@@ -231,7 +372,6 @@ fn write_to_output_directory(
         let target_output_path = output_directory
             .join(relative_dir_path)
             .join(target_filename);
-        dbg!(&target_output_path);
         return !target_output_path.exists();
     }
 
@@ -288,7 +428,7 @@ fn read_images_recursive_parallel(
         image_settings,
     );
 
-    println!("Found {} image files to process", valid_image_paths.len());
+    info!("Found {} image files to process", valid_image_paths.len());
 
     let images = create_images_from_paths_parallel(&valid_image_paths);
     image_list.extend(images);
@@ -329,7 +469,7 @@ fn create_images_from_paths_parallel(paths: &[PathBuf]) -> Vec<Image> {
         .filter_map(|path| match Image::new(path.clone()) {
             Ok(image) => Some(image),
             Err(e) => {
-                eprintln!("Failed to load image {}: {}", path.display(), e);
+                error!("Failed to load image {}: {}", path.display(), e);
                 None
             }
         })

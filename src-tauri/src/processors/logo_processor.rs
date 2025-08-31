@@ -1,14 +1,13 @@
 use std::error::Error;
 
-use image::{DynamicImage, ImageFormat};
+use ffmpeg_sidecar::command::FfmpegCommand;
 
-use crate::media::{image::load_image, Logo, Resolution};
+use crate::media::{
+    image::{apply_image_format_specific_args, ffmpeg_logger, read_image_resolution},
+    Logo, Resolution,
+};
 
 pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
-    let logo_img = load_image(&logo.file_path)?;
-
-    let resized_logo_img = resize_logo(logo_img, &logo.resolution)?;
-
     // Create a fixed folder structure in the application root
     let app_root = std::env::current_exe()?
         .parent()
@@ -32,11 +31,9 @@ pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
     );
 
     let output_path = output_directory.join(new_filename);
-    resized_logo_img.save_with_format(
-        &output_path,
-        ImageFormat::from_extension(file_extension)
-            .ok_or_else(|| format!("Unsupported image format for logo: {}", file_extension))?,
-    )?;
+
+    // Resize logo using FFmpeg
+    resize_logo(&logo.file_path, &output_path, &logo.resolution)?;
 
     // Overwrite the original logo path with the resized one to be used by images and videos in their processes
     logo.file_path = output_path;
@@ -45,13 +42,44 @@ pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
 }
 
 fn resize_logo(
-    logo_img: DynamicImage,
+    input_path: &std::path::PathBuf,
+    output_path: &std::path::PathBuf,
     resolution: &Resolution,
-) -> Result<DynamicImage, Box<dyn Error>> {
-    let resized_logo_img = logo_img.resize(
-        resolution.width,
-        resolution.height,
-        image::imageops::FilterType::Lanczos3,
-    );
-    Ok(resized_logo_img)
+) -> Result<(), Box<dyn Error>> {
+    // Check if resizing is needed
+    let current_resolution = read_image_resolution(input_path)?;
+    if current_resolution.width == resolution.width
+        && current_resolution.height == resolution.height
+    {
+        // No resizing needed, just copy the file
+        std::fs::copy(input_path, output_path)?;
+        return Ok(());
+    }
+
+    // Get file extension to determine format-specific settings
+    let file_extension = input_path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("png");
+
+    let mut ffmpeg_command = FfmpegCommand::new();
+    ffmpeg_command.args([
+        "-y", // Overwrite output file
+        "-i",
+        input_path.to_str().ok_or("Invalid input path")?,
+        "-vf",
+        &format!("scale={}:{}", resolution.width, resolution.height),
+        "-q:v",
+        "2", // High quality
+    ]);
+
+    apply_image_format_specific_args(file_extension, &mut ffmpeg_command);
+
+    let ffmpeg_child = ffmpeg_command
+        .output(output_path.to_str().ok_or("Invalid output path")?)
+        .spawn()?;
+
+    ffmpeg_logger(ffmpeg_child)?;
+
+    Ok(())
 }

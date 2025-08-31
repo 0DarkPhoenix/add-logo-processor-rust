@@ -1,14 +1,14 @@
 use crate::media::Resolution;
 
-pub fn calculate_resize_dimensions(original: &Resolution, min_pixel_count: u32) -> Resolution {
+pub fn calculate_resize_dimensions(original: &Resolution, min_pixel_count: &u32) -> Resolution {
     let aspect_ratio = original.width as f64 / original.height as f64;
 
     let (new_width, new_height) = if original.width < original.height {
-        let width = min_pixel_count as f64;
+        let width = *min_pixel_count as f64;
         let height = width / aspect_ratio;
         (width, height)
     } else {
-        let height = min_pixel_count as f64;
+        let height = *min_pixel_count as f64;
         let width = height * aspect_ratio;
         (width, height)
     };
@@ -33,7 +33,7 @@ pub trait Media {
         resolution.width as f64 / resolution.height as f64
     }
 
-    fn resize_dimensions(&mut self, min_pixel_count: u32) {
+    fn resize_dimensions(&mut self, min_pixel_count: &u32) {
         let new_resolution = calculate_resize_dimensions(self.get_resolution(), min_pixel_count);
         self.set_resolution(new_resolution);
     }

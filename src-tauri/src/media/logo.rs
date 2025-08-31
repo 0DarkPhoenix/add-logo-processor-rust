@@ -108,5 +108,5 @@ fn transform_resolution_with_scale(
     } else {
         resolution.height * scale / 100
     };
-    calculate_resize_dimensions(&logo_resolution, min_pixel_count)
+    calculate_resize_dimensions(&logo_resolution, &min_pixel_count)
 }
