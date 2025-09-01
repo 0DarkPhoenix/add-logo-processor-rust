@@ -35,7 +35,7 @@ pub fn process_image_batch(
     }
 
     // Process each image individually to avoid complex filter issues
-    for (i, (image, output_directory)) in batch_data.iter().enumerate() {
+    for (image, output_directory) in batch_data.iter() {
         let file_stem = image
             .file_path
             .file_stem()
@@ -54,9 +54,7 @@ pub fn process_image_batch(
 
         // Add optimization flags first
         cmd.args([
-            "-y", // Overwrite output file
-            "-threads",
-            "0",   // Use all available CPU cores
+            "-y",  // Overwrite output file
             "-an", // No audio processing
             "-vsync",
             "0", // Disable video sync (not needed for single images)
