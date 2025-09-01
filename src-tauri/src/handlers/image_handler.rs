@@ -134,16 +134,22 @@ fn process_images_from_image_list(
     let cpu_count = num_cpus::get();
     let total_images = batches.values().map(|v| v.len()).sum::<usize>();
 
-    // Use more threads for larger workloads
-    let optimal_threads = (cpu_count as f64 * 1.5) as usize;
+    // Using more batches for better thread utilization
+    // After much testing, the optimal number of batches seems to be 2 times the number of CPU cores
+    // * 1.5 = +5.08%
+    // * 1.75 = +0.86%
+    // * 2 = 0% - benchmark
+    // * 2.25 = +7.84%
+    // * 2.5 = +3.30%
+    let optimal_batches = cpu_count * 2;
 
     info!(
-        "Using {} threads for {} total images",
-        optimal_threads, total_images
+        "Using {} batches for {} total images",
+        optimal_batches, total_images
     );
 
     // Split large batches to better utilize threads
-    let work_units = split_batches_optimally(batches, optimal_threads);
+    let work_units = split_batches_optimally(batches, optimal_batches);
 
     info!(
         "Split into {} work units for optimal thread utilization",
