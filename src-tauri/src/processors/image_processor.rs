@@ -1,3 +1,4 @@
+use crate::handlers::progress_handler::ProgressManager;
 use crate::media::image::{apply_image_format_specific_args, ffmpeg_logger};
 use crate::media::{Image, Logo};
 use ffmpeg_sidecar::command::FfmpegCommand;
@@ -94,6 +95,8 @@ pub fn process_image_batch(
         let ffmpeg_child = cmd.spawn()?;
 
         ffmpeg_logger(ffmpeg_child)?;
+
+        ProgressManager::increment_progress();
     }
     let total_duration = start_time.elapsed();
     info!(

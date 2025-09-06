@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
 use walkdir::WalkDir;
 
+use crate::handlers::progress_handler::ProgressManager;
 use crate::utils::{clear_and_create_folder, get_relative_path};
 use crate::{
     handlers::handle_logos,
@@ -20,6 +21,8 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
     let mut image_list = Vec::new();
 
     let start_time = std::time::Instant::now();
+
+    ProgressManager::start_progress_with_terminal("Reading images... (Step 1/5)".to_string(), None);
 
     if image_settings.clear_files_output_directory || !output_directory.exists() {
         let clear_folder_time = std::time::Instant::now();
@@ -40,11 +43,13 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
     info!("Reading images took: {:?}", read_images_time.elapsed());
 
     if image_list.is_empty() {
+        ProgressManager::set_status("No images found in the input directory".to_string());
         info!("No images found in the input directory, returning early.");
         info!("Total time: {:?}", start_time.elapsed());
         return Ok(());
     }
 
+    ProgressManager::set_status("Sorting images by file size... (Step 2/5)".to_string());
     let sort_start = std::time::Instant::now();
     sort_list_by_file_size(&mut image_list);
     info!(
@@ -52,6 +57,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         sort_start.elapsed()
     );
 
+    ProgressManager::set_status("Applying image settings... (Step 3/5)".to_string());
     let apply_settings_start = std::time::Instant::now();
     apply_image_settings_per_image(image_settings, &mut image_list);
     info!(
@@ -59,6 +65,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         apply_settings_start.elapsed()
     );
 
+    ProgressManager::set_status("Processing logos... (Step 4/5)".to_string());
     let logo_processing_start = std::time::Instant::now();
     let logo_list = process_logos_for_image_resolutions(image_settings, &image_list)?;
     info!(
@@ -66,6 +73,8 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         logo_processing_start.elapsed()
     );
 
+    ProgressManager::set_status("Processing images... (Step 5/5)".to_string());
+    ProgressManager::set_total(image_list.len());
     let image_processing_start = std::time::Instant::now();
     process_images_from_image_list(
         output_directory,
@@ -74,6 +83,9 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         image_settings,
         input_directory,
     )?;
+
+    ProgressManager::finish_progress();
+
     info!(
         "Processing images took: {:?}",
         image_processing_start.elapsed()
@@ -131,7 +143,7 @@ fn process_images_from_image_list(
     }
 
     // Calculate optimal number of threads
-    let cpu_count = num_cpus::get();
+    let cpu_thread_count = num_cpus::get();
     let total_images = batches.values().map(|v| v.len()).sum::<usize>();
 
     // Using more batches for better thread utilization
@@ -141,7 +153,7 @@ fn process_images_from_image_list(
     // * 2 = 0% - benchmark
     // * 2.25 = +7.84%
     // * 2.5 = +3.30%
-    let optimal_batches = cpu_count * 2;
+    let optimal_batches = cpu_thread_count * 2;
 
     info!(
         "Using {} batches for {} total images",
