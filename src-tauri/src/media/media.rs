@@ -1,23 +1,26 @@
 use crate::media::Resolution;
 
 pub fn calculate_resize_dimensions(original: &Resolution, min_pixel_count: &u32) -> Resolution {
-    let aspect_ratio = original.width as f64 / original.height as f64;
+    let min_pixels = *min_pixel_count;
 
     let (new_width, new_height) = if original.width < original.height {
-        let width = *min_pixel_count as f64;
-        let height = width / aspect_ratio;
+        // Portrait: width is the constraining dimension
+        let width = min_pixels;
+        let height = (min_pixels * original.height + original.width / 2) / original.width;
         (width, height)
     } else {
-        let height = *min_pixel_count as f64;
-        let width = height * aspect_ratio;
+        // Landscape: height is the constraining dimension
+        let height = min_pixels;
+        let width = (min_pixels * original.width + original.height / 2) / original.height;
         (width, height)
     };
 
     Resolution {
-        width: new_width as u32,
-        height: new_height as u32,
+        width: new_width,
+        height: new_height,
     }
 }
+
 pub trait Media {
     type FileType;
 

@@ -294,6 +294,7 @@ fn split_batches_optimally(
     }
 
     // Sort work units by size (largest first) for better scheduling
+    // This now happens AFTER all work units are created, ensuring proper ordering
     work_units.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
 
     work_units

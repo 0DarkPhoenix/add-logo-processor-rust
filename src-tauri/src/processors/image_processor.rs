@@ -8,16 +8,16 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 pub fn process_image_batch(
-    batch_data: &[(Image, PathBuf)], // (Image, output_directory)
+    batch_data: &[(Image, PathBuf)],
     logo: Option<&Logo>,
 ) -> Result<(), Box<dyn Error>> {
     if batch_data.is_empty() {
         return Ok(());
     }
 
-    let start_time = Instant::now();
+    const MAX_CHUNK_SIZE: usize = 20;
 
-    // All images in a batch should have the same resolution and file type
+    let start_time = Instant::now();
     let first_image = &batch_data[0].0;
     let target_resolution = &first_image.resolution;
     let target_file_type = &first_image.file_type;
@@ -27,16 +27,82 @@ pub fn process_image_batch(
         batch_data.len(),
         target_resolution.width,
         target_resolution.height,
-        target_file_type
+        target_file_type,
     );
 
-    // Create output directories for all images first
+    // Process in chunks
+    process_image_chunk(batch_data, logo, target_resolution, target_file_type)?;
+
+    let total_duration = start_time.elapsed();
+    info!(
+        "Batch processing completed for {} images in {:?}",
+        batch_data.len(),
+        total_duration
+    );
+
+    Ok(())
+}
+
+fn process_image_chunk(
+    batch_data: &[(Image, PathBuf)],
+    logo: Option<&Logo>,
+    target_resolution: &crate::media::types::Resolution,
+    target_file_type: &str,
+) -> Result<(), Box<dyn Error>> {
+    // Create output directories
     for (_, output_directory) in batch_data {
         std::fs::create_dir_all(output_directory)?;
     }
 
-    // Process each image individually to avoid complex filter issues
-    for (image, output_directory) in batch_data.iter() {
+    // Build FFmpeg command for this chunk
+    let mut cmd = FfmpegCommand::new();
+
+    #[cfg(target_os = "windows")]
+    cmd.hide_banner();
+
+    cmd.args(["-y", "-an", "-vsync", "0"]);
+
+    // Add all input images in this chunk
+    for (image, _) in batch_data.iter() {
+        cmd.input(image.file_path.to_str().ok_or("Invalid image file path")?);
+    }
+
+    // Add logo input if present
+    if let Some(logo_ref) = logo {
+        cmd.input(
+            logo_ref
+                .file_path
+                .to_str()
+                .ok_or("Invalid logo file path")?,
+        );
+    }
+
+    // Build complex filter for this chunk
+    let mut filter_parts = Vec::new();
+
+    for (i, (image, _)) in batch_data.iter().enumerate() {
+        if let Some(logo_ref) = logo {
+            // Scale and overlay logo for each image
+            let logo_idx = batch_data.len(); // Logo is the last input
+            filter_parts.push(format!(
+                "[{}:v]scale={}:{}:flags=fast_bilinear[scaled{}];[scaled{}][{}:v]overlay={}:{}[out{}]",
+                i, target_resolution.width, target_resolution.height, i,
+                i, logo_idx, logo_ref.position.x, logo_ref.position.y, i
+            ));
+        } else {
+            // Just scale each image
+            filter_parts.push(format!(
+                "[{}:v]scale={}:{}:flags=fast_bilinear[out{}]",
+                i, target_resolution.width, target_resolution.height, i
+            ));
+        }
+    }
+
+    let filter_complex = filter_parts.join(";");
+    cmd.args(["-filter_complex", &filter_complex]);
+
+    // Add output mappings and files
+    for (i, (image, output_directory)) in batch_data.iter().enumerate() {
         let file_stem = image
             .file_path
             .file_stem()
@@ -46,64 +112,19 @@ pub fn process_image_batch(
         let new_filename = format!("{}.{}", file_stem, target_file_type);
         let output_file = output_directory.join(new_filename);
 
-        // Start building the ffmpeg command for this individual image
-        let mut cmd = FfmpegCommand::new();
-
-        // Hide command window on Windows
-        #[cfg(target_os = "windows")]
-        cmd.hide_banner();
-
-        // Add optimization flags first
-        cmd.args([
-            "-y",  // Overwrite output file
-            "-an", // No audio processing
-            "-vsync",
-            "0", // Disable video sync (not needed for single images)
-            "-frame_drop_threshold",
-            "0", // Don't drop frames
-        ]);
-
-        // Add input image
-        cmd.input(image.file_path.to_str().ok_or("Invalid image file path")?);
-
-        if let Some(logo) = logo {
-            // Add logo input image
-            cmd.input(logo.file_path.to_str().ok_or("Invalid logo file path")?);
-
-            // Scale image and overlay logo with optimized scaling
-            let filter = format!(
-                "[0:v]scale={}:{}:flags=fast_bilinear[scaled];[scaled][1:v]overlay={}:{}",
-                target_resolution.width, target_resolution.height, logo.position.x, logo.position.y
-            );
-            cmd.args(["-filter_complex", &filter]);
-        } else {
-            // Just scale the image if no logo with optimized scaling
-            let filter = format!(
-                "scale={}:{}:flags=fast_bilinear",
-                target_resolution.width, target_resolution.height
-            );
-            cmd.args(["-vf", &filter]);
-        }
-
-        // Set output format and quality settings for the target file type
+        cmd.args(["-map", &format!("[out{}]", i)]);
         apply_image_format_specific_args(target_file_type, &mut cmd);
-
-        // Set output file
         cmd.output(output_file.to_str().ok_or("Invalid output file path")?);
+    }
 
-        // Execute the command
-        let ffmpeg_child = cmd.spawn()?;
+    // Execute the command
+    let ffmpeg_child = cmd.spawn()?;
+    ffmpeg_logger(ffmpeg_child)?;
 
-        ffmpeg_logger(ffmpeg_child)?;
-
+    // Update progress for all images in this chunk
+    for _ in 0..batch_data.len() {
         ProgressManager::increment_progress();
     }
-    let total_duration = start_time.elapsed();
-    info!(
-        "Total batch processing time for {} images: {:?}",
-        batch_data.len(),
-        total_duration
-    );
 
     Ok(())
 }

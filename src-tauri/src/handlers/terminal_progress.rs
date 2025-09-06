@@ -8,7 +8,6 @@ pub struct TerminalProgressBar {
     show_rate: bool,
     show_eta: bool,
     show_elapsed: bool,
-    is_initialized: bool,
 }
 
 impl TerminalProgressBar {
@@ -19,7 +18,6 @@ impl TerminalProgressBar {
             show_rate: true,
             show_eta: true,
             show_elapsed: true,
-            is_initialized: false,
         }
     }
 
@@ -48,21 +46,8 @@ impl TerminalProgressBar {
         self
     }
 
-    pub fn init(&mut self) {
-        if !self.is_initialized {
-            // Save cursor position
-            print!("\x1b[s");
-            // Print an empty line for the progress bar
-            println!();
-            // Restore cursor position
-            print!("\x1b[u");
-            self.is_initialized = true;
-            io::stdout().flush().unwrap();
-        }
-    }
-
     pub fn display(
-        &mut self,
+        &self,
         current: usize,
         total: usize,
         status: &str,
@@ -70,17 +55,8 @@ impl TerminalProgressBar {
         rate: f64,
         eta: Option<Duration>,
     ) {
-        // Initialize if not done yet
-        self.init();
-
-        // Save current cursor position
-        print!("\x1b[s");
-
-        // Move to the top line (line 1)
-        print!("\x1b[1;1H");
-
-        // Clear the entire line
-        print!("\x1b[2K");
+        // Move cursor to bottom and clear the line
+        print!("\r");
 
         let percentage = if total > 0 {
             (current as f64 / total as f64) * 100.0
@@ -134,49 +110,21 @@ impl TerminalProgressBar {
 
         let info_string = info_parts.join(" | ");
 
-        // Print the complete progress line at the top
+        // Print the complete progress line
         print!("{}: {} {}", status, bar, info_string);
-
-        // Restore cursor position
-        print!("\x1b[u");
 
         // Flush to ensure immediate display
         io::stdout().flush().unwrap();
     }
 
-    pub fn finish(&mut self, status: &str) {
-        if self.is_initialized {
-            // Save current cursor position
-            print!("\x1b[s");
-
-            // Move to the top line
-            print!("\x1b[1;1H");
-
-            // Clear the line and print completion message
-            print!("\x1b[2K{}: Complete!", status);
-
-            // Restore cursor position
-            print!("\x1b[u");
-
-            io::stdout().flush().unwrap();
-            self.is_initialized = false;
-        }
+    pub fn finish(&self, status: &str) {
+        print!("\n\r{}: Complete!\n", status);
+        io::stdout().flush().unwrap();
     }
 
-    pub fn clear_line(&mut self) {
-        if self.is_initialized {
-            // Save current cursor position
-            print!("\x1b[s");
-
-            // Move to the top line and clear it
-            print!("\x1b[1;1H\x1b[2K");
-
-            // Restore cursor position
-            print!("\x1b[u");
-
-            io::stdout().flush().unwrap();
-            self.is_initialized = false;
-        }
+    pub fn clear_line(&self) {
+        print!("\r\x1b[K");
+        io::stdout().flush().unwrap();
     }
 
     fn format_duration(duration: Duration) -> String {
