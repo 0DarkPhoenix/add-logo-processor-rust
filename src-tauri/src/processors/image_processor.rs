@@ -15,8 +15,6 @@ pub fn process_image_batch(
         return Ok(());
     }
 
-    const MAX_CHUNK_SIZE: usize = 20;
-
     let start_time = Instant::now();
     let first_image = &batch_data[0].0;
     let target_resolution = &first_image.resolution;
@@ -80,7 +78,7 @@ fn process_image_chunk(
     // Build complex filter for this chunk
     let mut filter_parts = Vec::new();
 
-    for (i, (image, _)) in batch_data.iter().enumerate() {
+    for (i, _) in batch_data.iter().enumerate() {
         if let Some(logo_ref) = logo {
             // Scale and overlay logo for each image
             let logo_idx = batch_data.len(); // Logo is the last input
