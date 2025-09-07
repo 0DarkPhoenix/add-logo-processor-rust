@@ -213,6 +213,7 @@ fn process_images_from_image_list(
                 batch_key.resolution.height,
                 batch_key.file_type
             );
+            ProgressManager::redraw_progress();
 
             process_image_batch(&batch_data, logo).map_err(
                 |e| -> Box<dyn Error + Send + Sync> {

@@ -97,6 +97,12 @@ impl ProgressTracker {
         }
     }
 
+    pub fn redraw_terminal_progress(&self) {
+        if let Some(ref bar_cell) = self.terminal_bar {
+            bar_cell.borrow().redraw();
+        }
+    }
+
     fn update_calculations(&self, info: &mut ProgressInfo) {
         info.elapsed_time = self.start_time.elapsed();
         info.percentage = if info.total > 0 {
@@ -210,5 +216,12 @@ impl ProgressManager {
     pub fn clear_progress() {
         let mut global = GLOBAL_PROGRESS.lock().unwrap();
         *global = None;
+    }
+
+    pub fn redraw_progress() {
+        let global = GLOBAL_PROGRESS.lock().unwrap();
+        if let Some(tracker) = global.as_ref() {
+            tracker.redraw_terminal_progress();
+        }
     }
 }
