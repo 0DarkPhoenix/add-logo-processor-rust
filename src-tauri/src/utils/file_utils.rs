@@ -36,8 +36,6 @@ pub fn get_relative_path(
     base_directory: &Path,
     file_path: &Path,
 ) -> Result<PathBuf, Box<dyn Error>> {
-    dbg!(&base_directory);
-    dbg!(&file_path);
     let relative_path = file_path.strip_prefix(base_directory)?;
     Ok(relative_path.to_path_buf())
 }

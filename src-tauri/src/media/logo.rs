@@ -1,4 +1,7 @@
-use std::{error::Error, path::PathBuf};
+use std::{
+    error::Error,
+    path::{Path, PathBuf},
+};
 
 use crate::media::{
     image::read_image_resolution, media::calculate_resize_dimensions, Corner, Position, Resolution,
@@ -97,7 +100,7 @@ fn calculate_position(
 }
 
 fn transform_resolution_with_scale(
-    logo_path: &PathBuf,
+    logo_path: &Path,
     resolution: &Resolution,
     scale: u32,
 ) -> Resolution {

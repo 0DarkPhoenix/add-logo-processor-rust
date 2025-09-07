@@ -1,4 +1,7 @@
-use std::error::Error;
+use std::{
+    error::Error,
+    path::Path,
+};
 
 use ffmpeg_sidecar::command::FfmpegCommand;
 
@@ -7,18 +10,7 @@ use crate::media::{
     Logo, Resolution,
 };
 
-pub fn process_logo(logo: &mut Logo) -> Result<(), Box<dyn Error>> {
-    // Create a fixed folder structure in the application root
-    let app_root = std::env::current_exe()?
-        .parent()
-        .ok_or("Failed to get application directory")?
-        .to_path_buf();
-
-    let output_directory = app_root.join("temp_processed_images");
-
-    // Create the directory if it doesn't exist
-    std::fs::create_dir_all(&output_directory)?;
-
+pub fn process_logo(logo: &mut Logo, output_directory: &Path) -> Result<(), Box<dyn Error>> {
     let file_stem = logo.file_path.file_stem().unwrap().to_str().unwrap();
     let file_extension = logo.file_path.extension().unwrap().to_str().unwrap();
     let new_filename = format!(

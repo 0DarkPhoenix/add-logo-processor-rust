@@ -1,7 +1,10 @@
 use crate::{
     media::{Corner, Logo, Resolution},
     processors::logo_processor::process_logo,
-    utils::config::{ImageSettings, VideoSettings},
+    utils::{
+        clear_and_create_folder,
+        config::{ImageSettings, VideoSettings},
+    },
 };
 use rayon::prelude::*;
 use std::{error::Error, path::PathBuf};
@@ -54,6 +57,16 @@ pub fn handle_logos<T: LogoSettings>(
     settings: &T,
     unique_resolutions: Vec<Resolution>,
 ) -> Result<Vec<Logo>, Box<dyn Error + Send + Sync>> {
+    // Create a fixed folder structure in the application root
+    let app_root = std::env::current_exe()?
+        .parent()
+        .ok_or("Failed to get application directory")?
+        .to_path_buf();
+
+    let output_directory = app_root.join("temp_processed_images");
+
+    let _ = clear_and_create_folder(&output_directory);
+
     let mut logos = Vec::new();
     for resolution in &unique_resolutions {
         let logo = Logo::new(
@@ -72,10 +85,11 @@ pub fn handle_logos<T: LogoSettings>(
         })?;
         logos.push(logo);
     }
+    let output_dir_clone = output_directory.clone();
     logos
         .par_iter_mut()
         .try_for_each(|logo| -> Result<(), Box<dyn Error + Send + Sync>> {
-            process_logo(logo).map_err(|e| -> Box<dyn Error + Send + Sync> {
+            process_logo(logo, &output_dir_clone).map_err(|e| -> Box<dyn Error + Send + Sync> {
                 format!("Failed to process logo: {}", e).into()
             })
         })?;

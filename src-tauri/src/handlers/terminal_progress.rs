@@ -8,6 +8,8 @@ pub struct TerminalProgressBar {
     show_rate: bool,
     show_eta: bool,
     show_elapsed: bool,
+    is_displayed: bool,
+    last_progress_line: String,
 }
 
 impl TerminalProgressBar {
@@ -18,6 +20,8 @@ impl TerminalProgressBar {
             show_rate: true,
             show_eta: true,
             show_elapsed: true,
+            is_displayed: false,
+            last_progress_line: String::new(),
         }
     }
 
@@ -47,7 +51,7 @@ impl TerminalProgressBar {
     }
 
     pub fn display(
-        &self,
+        &mut self,
         current: usize,
         total: usize,
         status: &str,
@@ -55,14 +59,13 @@ impl TerminalProgressBar {
         rate: f64,
         eta: Option<Duration>,
     ) {
-        // Move cursor to bottom and clear the line
-        print!("\r");
-
         let percentage = if total > 0 {
             (current as f64 / total as f64) * 100.0
         } else {
             0.0
         };
+
+        let is_complete = current >= total && total > 0;
 
         let filled_width = if total > 0 {
             ((current as f64 / total as f64) * self.width as f64) as usize
@@ -109,22 +112,81 @@ impl TerminalProgressBar {
         }
 
         let info_string = info_parts.join(" | ");
+        let progress_line = format!("{}: {} {}", status, bar, info_string);
 
-        // Print the complete progress line
-        print!("{}: {} {}", status, bar, info_string);
+        if is_complete {
+            // For completion, clear the persistent progress bar and print final message
+            if self.is_displayed {
+                self.clear_persistent_progress();
+            }
+            println!("{} - Complete!", progress_line);
+            self.is_displayed = false;
+            self.last_progress_line.clear();
+        } else {
+            // Store the current progress line
+            self.last_progress_line = progress_line.clone();
+
+            if !self.is_displayed {
+                // First time showing progress - reserve space at bottom
+                self.setup_persistent_progress();
+                self.is_displayed = true;
+            }
+
+            // Update the progress line at the bottom
+            self.update_persistent_progress(&progress_line);
+        }
 
         // Flush to ensure immediate display
         io::stdout().flush().unwrap();
     }
 
-    pub fn finish(&self, status: &str) {
-        print!("\n\r{}: Complete!\n", status);
+    pub fn finish(&mut self, status: &str) {
+        if self.is_displayed {
+            self.clear_persistent_progress();
+        }
+        println!("{}: Complete!", status);
+        self.is_displayed = false;
+        self.last_progress_line.clear();
         io::stdout().flush().unwrap();
     }
 
-    pub fn clear_line(&self) {
-        print!("\r\x1b[K");
-        io::stdout().flush().unwrap();
+    pub fn clear_line(&mut self) {
+        if self.is_displayed {
+            self.clear_persistent_progress();
+            self.is_displayed = false;
+            self.last_progress_line.clear();
+        }
+    }
+
+    // Method to redraw the progress bar (can be called externally when needed)
+    pub fn redraw(&self) {
+        if self.is_displayed && !self.last_progress_line.is_empty() {
+            self.update_persistent_progress(&self.last_progress_line);
+            io::stdout().flush().unwrap();
+        }
+    }
+
+    fn setup_persistent_progress(&self) {
+        // Move to bottom and create space for progress bar
+        print!("\x1b[s"); // Save cursor position
+        print!("\x1b[999;999H"); // Move to bottom-right corner
+        println!(); // Add a new line for our progress bar
+        print!("\x1b[u"); // Restore cursor position
+    }
+
+    fn update_persistent_progress(&self, progress_line: &str) {
+        print!("\x1b[s"); // Save cursor position
+        print!("\x1b[999;1H"); // Move to last line, first column
+        print!("\x1b[K"); // Clear the line
+        print!("{}", progress_line);
+        print!("\x1b[u"); // Restore cursor position
+    }
+
+    fn clear_persistent_progress(&self) {
+        print!("\x1b[s"); // Save cursor position
+        print!("\x1b[999;1H"); // Move to last line, first column
+        print!("\x1b[K"); // Clear the line
+        print!("\x1b[u"); // Restore cursor position
     }
 
     fn format_duration(duration: Duration) -> String {

@@ -260,7 +260,6 @@ impl AppConfig {
     /// Load configuration from file or create default
     pub fn load_or_create_default(app_handle: &AppHandle) -> Result<AppConfig, Box<dyn Error>> {
         let config_path = Self::get_config_path(app_handle)?;
-        dbg!(&config_path);
 
         if config_path.exists() {
             let config_str = fs::read_to_string(&config_path)?;
