@@ -1,11 +1,24 @@
 use crate::{
-    handlers::{handle_images, handle_videos},
+    handlers::{
+        handle_images, handle_videos,
+        progress_handler::{ProgressInfo, ProgressManager},
+    },
     utils::AppConfig,
     AppState, ImageSettings, VideoSettings,
 };
 use tauri::State;
 
 #[tauri::command]
+pub fn load_config() -> Result<AppConfig, String> {
+    Ok(AppConfig::global())
+}
+
+#[tauri::command]
+pub fn get_progress_info() -> Result<Option<ProgressInfo>, String> {
+    Ok(ProgressManager::get_progress())
+}
+
+#[tauri::command(async)]
 pub fn process_images(
     app_state: State<AppState>,
     image_settings: ImageSettings,
@@ -18,7 +31,7 @@ pub fn process_images(
     Ok(())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn process_videos(
     app_state: State<AppState>,
     video_settings: VideoSettings,
@@ -29,9 +42,4 @@ pub fn process_videos(
     handle_videos(&video_settings).map_err(|e| e.to_string())?;
 
     Ok(())
-}
-
-#[tauri::command]
-pub fn load_config() -> Result<AppConfig, String> {
-    Ok(AppConfig::global())
 }

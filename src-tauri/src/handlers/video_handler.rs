@@ -99,9 +99,8 @@ fn process_videos_from_video_list(
     video_settings: &VideoSettings,
     input_directory: &Path,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    video_list
-        .par_iter()
-        .try_for_each(|video| -> Result<(), Box<dyn Error + Send + Sync>> {
+    video_list.into_iter().par_bridge().try_for_each(
+        |video| -> Result<(), Box<dyn Error + Send + Sync>> {
             let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
                 logo_list
                     .iter()
@@ -130,12 +129,13 @@ fn process_videos_from_video_list(
                     output_directory.to_path_buf()
                 };
 
-            process_video(video, logo, &final_output_directory).map_err(
+            process_video(&video, logo, &final_output_directory).map_err(
                 |e| -> Box<dyn Error + Send + Sync> {
                     format!("Failed to process video: {}", e).into()
                 },
             )
-        })?;
+        },
+    )?;
     Ok(())
 }
 

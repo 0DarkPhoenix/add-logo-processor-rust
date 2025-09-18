@@ -3,16 +3,43 @@ use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use ts_rs::TS;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../../src/types/", rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ProgressInfo {
     pub current: usize,
     pub total: usize,
     pub percentage: f64,
+    #[ts(type = "number")]
+    #[serde(serialize_with = "serialize_duration_as_secs")]
     pub elapsed_time: Duration,
+    #[ts(type = "number | null")]
+    #[serde(serialize_with = "serialize_optional_duration_as_secs")]
     pub estimated_remaining: Option<Duration>,
-    pub images_per_second: f64,
+    pub items_per_second: f64,
     pub status: String,
+}
+
+fn serialize_duration_as_secs<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    serializer.serialize_f64(duration.as_secs_f64())
+}
+
+fn serialize_optional_duration_as_secs<S>(
+    duration: &Option<Duration>,
+    serializer: S,
+) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    match duration {
+        Some(d) => serializer.serialize_some(&d.as_secs_f64()),
+        None => serializer.serialize_none(),
+    }
 }
 
 impl ProgressInfo {
@@ -23,7 +50,7 @@ impl ProgressInfo {
             percentage: 0.0,
             elapsed_time: Duration::from_secs(0),
             estimated_remaining: None,
-            images_per_second: 0.0,
+            items_per_second: 0.0,
             status,
         }
     }
@@ -34,6 +61,7 @@ pub struct ProgressTracker {
     info: Arc<Mutex<ProgressInfo>>,
     start_time: Instant,
     terminal_bar: Option<RefCell<TerminalProgressBar>>,
+    is_finished: Arc<Mutex<bool>>,
 }
 
 impl ProgressTracker {
@@ -42,6 +70,7 @@ impl ProgressTracker {
             info: Arc::new(Mutex::new(ProgressInfo::new(status, total))),
             start_time: Instant::now(),
             terminal_bar: None,
+            is_finished: Arc::new(Mutex::new(false)),
         }
     }
 
@@ -78,6 +107,7 @@ impl ProgressTracker {
     pub fn set_total(&self, total: usize) {
         let mut info = self.info.lock().unwrap();
         info.total = total;
+        self.update_calculations(&mut info);
         self.display_terminal_progress(&info);
     }
 
@@ -87,10 +117,19 @@ impl ProgressTracker {
 
     pub fn is_complete(&self) -> bool {
         let info = self.info.lock().unwrap();
-        info.current >= info.total
+        info.current >= info.total && info.total > 0
+    }
+
+    pub fn is_finished(&self) -> bool {
+        *self.is_finished.lock().unwrap()
     }
 
     pub fn finish(&self) {
+        {
+            let mut finished = self.is_finished.lock().unwrap();
+            *finished = true;
+        }
+
         if let Some(ref bar_cell) = self.terminal_bar {
             let info = self.info.lock().unwrap();
             bar_cell.borrow_mut().finish(&info.status);
@@ -112,12 +151,12 @@ impl ProgressTracker {
         };
 
         if info.elapsed_time.as_secs_f64() > 0.0 {
-            info.images_per_second = info.current as f64 / info.elapsed_time.as_secs_f64();
+            info.items_per_second = info.current as f64 / info.elapsed_time.as_secs_f64();
         }
 
-        if info.current > 0 && info.current < info.total && info.images_per_second > 0.0 {
+        if info.current > 0 && info.current < info.total && info.items_per_second > 0.0 {
             let remaining_images = info.total - info.current;
-            let estimated_seconds = remaining_images as f64 / info.images_per_second;
+            let estimated_seconds = remaining_images as f64 / info.items_per_second;
             info.estimated_remaining = Some(Duration::from_secs_f64(estimated_seconds));
         } else {
             info.estimated_remaining = None;
@@ -131,7 +170,7 @@ impl ProgressTracker {
                 info.total,
                 &info.status,
                 info.elapsed_time,
-                info.images_per_second,
+                info.items_per_second,
                 info.estimated_remaining,
             );
         }
@@ -203,7 +242,9 @@ impl ProgressManager {
 
     pub fn is_complete() -> bool {
         let global = GLOBAL_PROGRESS.lock().unwrap();
-        global.as_ref().is_none_or(|tracker| tracker.is_complete())
+        global
+            .as_ref()
+            .is_some_and(|tracker| tracker.is_complete())
     }
 
     pub fn finish_progress() {
@@ -223,5 +264,25 @@ impl ProgressManager {
         if let Some(tracker) = global.as_ref() {
             tracker.redraw_terminal_progress();
         }
+    }
+
+    // New method to check if progress exists and is active
+    pub fn has_active_progress() -> bool {
+        let global = GLOBAL_PROGRESS.lock().unwrap();
+        global
+            .as_ref()
+            .is_some_and(|tracker| !tracker.is_finished())
+    }
+
+    // New method to get progress only if it's active
+    pub fn get_active_progress() -> Option<ProgressInfo> {
+        let global = GLOBAL_PROGRESS.lock().unwrap();
+        global.as_ref().and_then(|tracker| {
+            if !tracker.is_finished() {
+                Some(tracker.get_info())
+            } else {
+                None
+            }
+        })
     }
 }

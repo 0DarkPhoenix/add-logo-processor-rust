@@ -168,8 +168,8 @@ fn process_images_from_image_list(
         work_units.len()
     );
 
-    // Process work units in parallel
-    work_units.into_par_iter().try_for_each(
+    // Process work units in parallel with ordered task distribution
+    work_units.into_iter().par_bridge().try_for_each(
         |(batch_key, images)| -> Result<(), Box<dyn Error + Send + Sync>> {
             let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
                 logo_list

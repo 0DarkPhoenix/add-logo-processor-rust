@@ -1,8 +1,9 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { LogoConfiguratorCard } from "@/components/shared/LogoConfiguratorCard";
+import ProgressBar from "@/components/shared/ProgressBar";
 import { Button } from "@/components/ui/button";
 import { VideoResizeDimensionsCard } from "@/components/video-components/VideoProcessingOptionsCard";
 import type { AppConfig } from "@/types/AppConfig";
@@ -13,6 +14,8 @@ import { logoCorners, videoFormats, videoFormSchema } from "../../schema/videoFo
 import type { VideoSettings } from "../../types/VideoSettings";
 
 export default function VideoProcessingPage() {
+	const [isProcessing, setIsProcessing] = useState(false);
+
 	const form = useForm<VideoSettings>({
 		resolver: zodResolver(videoFormSchema),
 		defaultValues: {
@@ -53,8 +56,15 @@ export default function VideoProcessingPage() {
 		loadConfig();
 	}, [form]);
 
-	const onSubmit = (data: VideoSettings) => {
-		invoke("process_videos", { videoSettings: data });
+	const onSubmit = async (data: VideoSettings) => {
+		setIsProcessing(true);
+		try {
+			await invoke("process_videos", { imageSettings: data });
+		} catch (error) {
+			console.error("Processing failed:", error);
+		} finally {
+			setIsProcessing(false);
+		}
 	};
 
 	return (
@@ -71,12 +81,13 @@ export default function VideoProcessingPage() {
 
 						<LogoConfiguratorCard />
 
-						<Button type='submit' variant='default'>
-							Process Videos
+						<Button type='submit' variant='default' disabled={isProcessing}>
+							{isProcessing ? "Processing..." : "Process Videos"}
 						</Button>
 					</form>
 				</Form>
 			</div>
+			<ProgressBar isProcessing={isProcessing} />
 		</AppLayout>
 	);
 }

@@ -2,6 +2,7 @@ use ffmpeg_sidecar::download::auto_download;
 use tauri::{AppHandle, Manager};
 use tauri_plugin_log::{Target, TargetKind};
 // Re-export types for ts-rs
+pub use handlers::progress_handler::ProgressInfo;
 pub use media::Corner;
 pub use utils::config::{AppConfig, ImageSettings, VideoSettings};
 
@@ -50,6 +51,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::load_config,
+            commands::get_progress_info,
             commands::process_images,
             commands::process_videos
         ])

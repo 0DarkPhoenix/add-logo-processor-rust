@@ -135,8 +135,8 @@ pub fn apply_image_format_specific_args(image_format: &str, cmd: &mut FfmpegComm
 
 /// Handle resizing an image to ICO format with FFmpeg
 fn handle_resize_to_ico_format(
-    input_path: &PathBuf,
-    output_path: &PathBuf,
+    input_path: &Path,
+    output_path: &Path,
     resolution: &Resolution,
 ) -> Result<(), Box<dyn Error>> {
     // ICO format maximum size is 256x256, preserve aspect ratio
@@ -191,19 +191,10 @@ pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error>
             FfmpegEvent::Error(error) => {
                 error_messages.push(error);
             }
-            // FfmpegEvent::Progress(progress) => {
-            //     // Optionally log progress for images (though it's usually very fast)
-            //     println!(
-            //         "Progress: frame={}, fps={}, time={}",
-            //         progress.frame, progress.fps, progress.time
-            //     );
-            // }
             FfmpegEvent::Done => {
                 println!("FFmpeg image processing completed successfully");
             }
-            _ => {
-                // Handle other events if needed
-            }
+            _ => {}
         }
     });
     let output = ffmpeg_child.wait()?;

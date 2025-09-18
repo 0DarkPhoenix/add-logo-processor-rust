@@ -1,9 +1,10 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { ImageResizeDimensionsCard } from "@/components/image-components/ImageProcessingOptionsCard";
 import { LogoConfiguratorCard } from "@/components/shared/LogoConfiguratorCard";
+import ProgressBar from "@/components/shared/ProgressBar";
 import { Button } from "@/components/ui/button";
 import type { AppConfig } from "@/types/AppConfig";
 import { AppLayout } from "../../components/layout/AppLayout";
@@ -13,6 +14,8 @@ import { imageFormats, imageFormSchema, logoCorners } from "../../schema/imageFo
 import type { ImageSettings } from "../../types/ImageSettings";
 
 export default function ImageProcessingPage() {
+	const [isProcessing, setIsProcessing] = useState(false);
+
 	const form = useForm<ImageSettings>({
 		resolver: zodResolver(imageFormSchema),
 		defaultValues: {
@@ -53,8 +56,15 @@ export default function ImageProcessingPage() {
 		loadConfig();
 	}, [form]);
 
-	const onSubmit = (data: ImageSettings) => {
-		invoke("process_images", { imageSettings: data });
+	const onSubmit = async (data: ImageSettings) => {
+		setIsProcessing(true);
+		try {
+			await invoke("process_images", { imageSettings: data });
+		} catch (error) {
+			console.error("Processing failed:", error);
+		} finally {
+			setIsProcessing(false);
+		}
 	};
 
 	return (
@@ -71,12 +81,13 @@ export default function ImageProcessingPage() {
 
 						<LogoConfiguratorCard />
 
-						<Button type='submit' variant='default'>
-							Process Images
+						<Button type='submit' variant='default' disabled={isProcessing}>
+							{isProcessing ? "Processing..." : "Process Images"}
 						</Button>
 					</form>
 				</Form>
 			</div>
+			<ProgressBar isProcessing={isProcessing} />
 		</AppLayout>
 	);
 }
