@@ -70,8 +70,12 @@ export function LogoConfiguratorCard() {
 									value='topLeft'
 									id={`${baseId}-topLeft`}
 									disabled={!addLogo}
+									className='flex-shrink-0'
 								/>
-								<Label htmlFor={`${baseId}-topLeft`} className='text-sm'>
+								<Label
+									htmlFor={`${baseId}-topLeft`}
+									className='text-sm cursor-pointer'
+								>
 									Top Left
 								</Label>
 							</div>
@@ -80,8 +84,12 @@ export function LogoConfiguratorCard() {
 									value='topRight'
 									id={`${baseId}-topRight`}
 									disabled={!addLogo}
+									className='flex-shrink-0'
 								/>
-								<Label htmlFor={`${baseId}-topRight`} className='text-sm'>
+								<Label
+									htmlFor={`${baseId}-topRight`}
+									className='text-sm cursor-pointer'
+								>
 									Top Right
 								</Label>
 							</div>
@@ -92,8 +100,12 @@ export function LogoConfiguratorCard() {
 									value='bottomLeft'
 									id={`${baseId}-bottomLeft`}
 									disabled={!addLogo}
+									className='flex-shrink-0'
 								/>
-								<Label htmlFor={`${baseId}-bottomLeft`} className='text-sm'>
+								<Label
+									htmlFor={`${baseId}-bottomLeft`}
+									className='text-sm cursor-pointer'
+								>
 									Bottom Left
 								</Label>
 							</div>
@@ -102,15 +114,18 @@ export function LogoConfiguratorCard() {
 									value='bottomRight'
 									id={`${baseId}-bottomRight`}
 									disabled={!addLogo}
+									className='flex-shrink-0'
 								/>
-								<Label htmlFor={`${baseId}-bottomRight`} className='text-sm'>
+								<Label
+									htmlFor={`${baseId}-bottomRight`}
+									className='text-sm cursor-pointer'
+								>
 									Bottom Right
 								</Label>
 							</div>
 						</div>
 					</RadioGroup>
 				</div>
-
 				{/* Logo Scale and Offset Settings */}
 				<div className='space-y-4'>
 					<div>

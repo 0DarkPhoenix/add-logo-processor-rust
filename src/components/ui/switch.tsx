@@ -64,6 +64,9 @@ function Switch({
 				alignItems: "center",
 				width: "44px",
 				height: "24px",
+				minWidth: "44px",
+				maxWidth: "44px",
+				flexShrink: 0,
 				backgroundColor: getBackgroundColor(),
 				borderRadius: "12px",
 				position: "relative",
@@ -85,7 +88,7 @@ function Switch({
 					position: "absolute",
 					left: "2px",
 					top: "50%",
-					transform: `translateY(-50%) translateX(${checked ? "20px" : "0px"})`,
+					transform: `translateY(-50%) translateX(${checked ? "100%" : "0px"})`,
 					transition: "transform 0.2s ease",
 					boxShadow: "0 2px 4px rgba(0, 0, 0, 0.2)",
 				}}

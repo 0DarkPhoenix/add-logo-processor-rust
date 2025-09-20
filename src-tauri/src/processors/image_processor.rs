@@ -2,8 +2,10 @@ use crate::handlers::progress_handler::ProgressManager;
 use crate::media::image::{apply_image_format_specific_args, ffmpeg_logger};
 use crate::media::{Image, Logo};
 use ffmpeg_sidecar::command::FfmpegCommand;
+use log::info;
 use std::error::Error;
 use std::path::PathBuf;
+use std::time::Instant;
 
 pub fn process_image_batch(
     batch_data: &[(Image, PathBuf)],
@@ -13,12 +15,21 @@ pub fn process_image_batch(
         return Ok(());
     }
 
+    let start_time = Instant::now();
     let first_image = &batch_data[0].0;
     let target_resolution = &first_image.resolution;
     let target_file_type = &first_image.file_type;
 
-    // Process in chunks for better load balancing and better progress bar progression
-    const CHUNK_SIZE: usize = 15;
+    info!(
+        "Processing batch of {} images with resolution {}x{} and format {}",
+        batch_data.len(),
+        target_resolution.width,
+        target_resolution.height,
+        target_file_type,
+    );
+
+    // Process in chunks for better load balancing and more frequent progress bar progression
+    const CHUNK_SIZE: usize = 10;
 
     if batch_data.len() <= CHUNK_SIZE {
         process_image_chunk(batch_data, logo, target_resolution, target_file_type)?;
@@ -30,6 +41,13 @@ pub fn process_image_batch(
             process_image_chunk(chunk, logo, target_resolution, target_file_type)?;
         }
     }
+
+    let total_duration = start_time.elapsed();
+    info!(
+        "Batch processing completed for {} images in {:?}",
+        batch_data.len(),
+        total_duration
+    );
 
     Ok(())
 }
@@ -112,10 +130,7 @@ fn process_image_chunk(
     let ffmpeg_child = cmd.spawn()?;
     ffmpeg_logger(ffmpeg_child)?;
 
-    // Update progress for all images in this chunk
-    for _ in 0..batch_data.len() {
-        ProgressManager::increment_progress();
-    }
+    ProgressManager::increment_progress(Some(batch_data.len()));
 
     Ok(())
 }

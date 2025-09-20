@@ -100,17 +100,11 @@ pub fn apply_image_format_specific_args(image_format: &str, cmd: &mut FfmpegComm
             ]);
         }
         name if image_format::JPEG.extensions.contains(&name) => {
-            cmd.args([
-                "-pix_fmt", "yuv420p", // Standard format, faster than yuvj420p
-                "-q:v", "3", // High enough quality while maintaining performance
-                "-huffman", "0", // Use default huffman tables (faster than optimal (1))
-            ]);
+            cmd.args(["-pix_fmt", "yuv420p", "-q:v", "3", "-huffman", "0"]);
         }
         name if image_format::WEBP.extensions.contains(&name) => {
             cmd.args([
-                "-quality", "75", // Slightly lower quality for better performance
-                "-pix_fmt", "yuva420p", "-preset", "default", "-method",
-                "2", // Compression method (0-6, 4 is good balance)
+                "-quality", "75", "-pix_fmt", "yuva420p", "-preset", "default", "-method", "2",
             ]);
         }
         name if image_format::BMP.extensions.contains(&name) => {
@@ -124,9 +118,9 @@ pub fn apply_image_format_specific_args(image_format: &str, cmd: &mut FfmpegComm
                 "-pix_fmt",
                 "rgba",
                 "-compression_algo",
-                "deflate", // Good compression
+                "deflate",
                 "-pred",
-                "0", // Horizontal prediction for better compression
+                "0",
             ]);
         }
         _ => {}

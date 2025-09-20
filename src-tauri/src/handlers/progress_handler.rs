@@ -84,9 +84,9 @@ impl ProgressTracker {
         self
     }
 
-    pub fn increment(&self) {
+    pub fn increment(&self, value: Option<usize>) {
         let mut info = self.info.lock().unwrap();
-        info.current += 1;
+        info.current += value.unwrap_or(1);
         self.update_calculations(&mut info);
         self.display_terminal_progress(&info);
     }
@@ -207,10 +207,10 @@ impl ProgressManager {
         *global = Some(tracker);
     }
 
-    pub fn increment_progress() {
+    pub fn increment_progress(value: Option<usize>) {
         let global = GLOBAL_PROGRESS.lock().unwrap();
         if let Some(tracker) = global.as_ref() {
-            tracker.increment();
+            tracker.increment(value);
         }
     }
 
@@ -242,9 +242,7 @@ impl ProgressManager {
 
     pub fn is_complete() -> bool {
         let global = GLOBAL_PROGRESS.lock().unwrap();
-        global
-            .as_ref()
-            .is_some_and(|tracker| tracker.is_complete())
+        global.as_ref().is_some_and(|tracker| tracker.is_complete())
     }
 
     pub fn finish_progress() {

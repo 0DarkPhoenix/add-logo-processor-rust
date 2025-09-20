@@ -20,6 +20,7 @@ function FileInput({
 	directory = false,
 	multiple = false,
 	value = "",
+	disabled = false,
 	...props
 }: FileInputProps) {
 	const [selectedPath, setSelectedPath] = useState<string>(value);
@@ -30,10 +31,28 @@ function FileInput({
 	}, [value]);
 
 	const handleBrowse = async () => {
+		if (disabled) {
+			return;
+		}
+
 		try {
+			// Only use defaultPath for directories, not files
+			let defaultPathToUse: string | undefined;
+			if (directory && selectedPath) {
+				defaultPathToUse = selectedPath;
+			} else if (!directory && selectedPath) {
+				// For files, extract just the directory
+				const pathParts = selectedPath.split(/[/\\]/);
+				if (pathParts.length > 1) {
+					pathParts.pop(); // Remove filename
+					defaultPathToUse = pathParts.join("\\");
+				}
+			}
+
 			const result = await open({
 				directory,
 				multiple,
+				defaultPath: defaultPathToUse,
 				filters: accept
 					? [
 							{
@@ -57,15 +76,21 @@ function FileInput({
 	};
 
 	return (
-		<div className='flex w-full'>
+		<div className='flex w-full items-end'>
 			<input
 				type='text'
-				readOnly
 				value={selectedPath}
+				onChange={(e) => {
+					const newPath = e.target.value;
+					setSelectedPath(newPath);
+					onChange?.(newPath);
+				}}
 				placeholder={placeholder}
 				data-slot='input'
+				title={selectedPath || placeholder}
+				disabled={disabled}
 				className={cn(
-					"file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input flex h-9 w-full min-w-0 rounded-l-md border border-r-0 bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+					"file:text-foreground placeholder:text-muted-foreground selection:bg-primary selection:text-primary-foreground dark:bg-input/30 border-input h-9 flex-1 min-w-0 rounded-l-md border border-r-0 bg-transparent px-3 py-1 text-base shadow-xs transition-[color,box-shadow] outline-none disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 md:text-sm leading-none",
 					"focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]",
 					"aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive",
 					className,
@@ -75,12 +100,24 @@ function FileInput({
 			<button
 				type='button'
 				onClick={handleBrowse}
+				disabled={disabled}
 				className={cn(
-					"border-input bg-muted hover:bg-muted/80 text-muted-foreground flex h-9 items-center rounded-r-md border px-3 text-sm font-medium transition-colors",
+					"border-input bg-muted hover:bg-muted/80 text-muted-foreground h-9 flex items-center justify-center rounded-r-md border px-3 text-sm font-medium transition-colors shrink-0 leading-none",
 					"focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
+					"disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50",
 				)}
 			>
-				Browse
+				<svg
+					xmlns='http://www.w3.org/2000/svg'
+					height='20px'
+					viewBox='0 -960 960 960'
+					width='20px'
+					fill='currentColor'
+					aria-hidden='true'
+				>
+					<title>Folder open icon</title>
+					<path d='M160-160q-33 0-56.5-23.5T80-240v-480q0-33 23.5-56.5T160-800h240l80 80h320q33 0 56.5 23.5T880-640H447l-80-80H160v480l96-320h684L837-217q-8 26-29.5 41.5T760-160H160Zm84-80h516l72-240H316l-72 240Zm0 0 72-240-72 240Zm-84-400v-80 80Z' />
+				</svg>
 			</button>
 		</div>
 	);
