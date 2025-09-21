@@ -8,6 +8,10 @@ interface ProgressProps extends React.ComponentProps<typeof ProgressPrimitive.Ro
 }
 
 function Progress({ className, value, ...props }: ProgressProps) {
+	const progressValue = value || 0;
+	const isComplete = progressValue >= 100;
+	const isAtZero = progressValue === 0;
+
 	const progressBarElement = (
 		<ProgressPrimitive.Root
 			data-slot='progress'
@@ -28,8 +32,21 @@ function Progress({ className, value, ...props }: ProgressProps) {
                     }
                     .progress-animation {
                         animation: progress-shine 1s ease-in-out infinite;
+                    }
+                    .progress-animation-paused {
+                        animation-play-state: paused;
                     }`}
 			</style>
+
+			{/* Full-width shine animation when at 0% */}
+			{isAtZero && (
+				<div
+					className={cn(
+						"absolute left-0 w-6 h-full blur-sm inset-y-0 progress-animation",
+						"bg-white/100 shadow-lg",
+					)}
+				/>
+			)}
 
 			<ProgressPrimitive.Indicator
 				data-slot='progress-indicator'
@@ -37,14 +54,18 @@ function Progress({ className, value, ...props }: ProgressProps) {
 					"h-full w-full flex-1 transition-all relative overflow-hidden",
 					"bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 rounded-l-full",
 				)}
-				style={{ transform: `translateX(-${100 - (value || 0)}%)` }}
+				style={{ transform: `translateX(-${100 - progressValue}%)` }}
 			>
-				<div
-					className={cn(
-						"absolute left-0 w-6 h-full blur-sm inset-y-0 progress-animation",
-						"bg-white/100 shadow-lg",
-					)}
-				/>
+				{/* Shine animation within the progress indicator (stops at 100%) */}
+				{!isAtZero && (
+					<div
+						className={cn(
+							"absolute left-0 w-6 h-full blur-sm inset-y-0",
+							"bg-white/100 shadow-lg",
+							isComplete ? "" : "progress-animation",
+						)}
+					/>
+				)}
 			</ProgressPrimitive.Indicator>
 		</ProgressPrimitive.Root>
 	);
@@ -52,7 +73,7 @@ function Progress({ className, value, ...props }: ProgressProps) {
 	return (
 		<div className='w-full flex items-center justify-center gap-3'>
 			{progressBarElement}
-			<span className='text-sm'>{value || 0}%</span>
+			<span className='text-sm'>{progressValue}%</span>
 		</div>
 	);
 }

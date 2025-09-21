@@ -7,7 +7,6 @@ import ProgressBar from "@/components/shared/ProgressBar";
 import { Button } from "@/components/ui/button";
 import { VideoResizeDimensionsCard } from "@/components/video-components/VideoProcessingOptionsCard";
 import type { AppConfig } from "@/types/AppConfig";
-import { AppLayout } from "../../components/layout/AppLayout";
 import { DirectorySelectionCard } from "../../components/shared/DirectorySelectionCard";
 import { Form } from "../../components/ui/form";
 import { logoCorners, videoFormats, videoFormSchema } from "../../schema/videoForm";
@@ -68,7 +67,7 @@ export default function VideoProcessingPage() {
 	};
 
 	return (
-		<AppLayout>
+		<>
 			<div className='flex-1 flex align-center gap-6 min-w-0'>
 				<Form {...form}>
 					<form
@@ -88,6 +87,6 @@ export default function VideoProcessingPage() {
 				</Form>
 			</div>
 			<ProgressBar isProcessing={isProcessing} />
-		</AppLayout>
+		</>
 	);
 }

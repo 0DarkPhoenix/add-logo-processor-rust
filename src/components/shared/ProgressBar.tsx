@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ProgressInfo } from "../../types/ProgressInfo";
 import { Progress } from "../ui/progress";
 
@@ -10,64 +10,78 @@ interface ProgressBarProps {
 export default function ProgressBar({ isProcessing }: ProgressBarProps) {
 	const [progressInfo, setProgressInfo] = useState<ProgressInfo | null>(null);
 	const [isVisible, setIsVisible] = useState(false);
+	const [isCompleted, setIsCompleted] = useState(false);
+	const hideTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
 	useEffect(() => {
 		let intervalId: NodeJS.Timeout;
-		let hideTimeout: NodeJS.Timeout;
 
 		const fetchProgress = async () => {
 			try {
 				const result = await invoke<ProgressInfo | null>("get_progress_info");
-				console.log("result", result);
 				if (result) {
 					setProgressInfo(result);
 					setIsVisible(true);
-					// Clear any existing hide timeout since we have active progress
-					if (hideTimeout) {
-						clearTimeout(hideTimeout);
+
+					// Check if progress reaches 100%
+					if (result.percentage >= 100 && !isCompleted) {
+						setIsCompleted(true);
+						if (intervalId) {
+							clearInterval(intervalId);
+						}
+
+						// Clear any existing timeout
+						if (hideTimeoutRef.current) {
+							clearTimeout(hideTimeoutRef.current);
+						}
+
+						// Set timeout to hide after 2 seconds
+						hideTimeoutRef.current = setTimeout(() => {
+							setIsVisible(false);
+							setProgressInfo(null);
+							setIsCompleted(false);
+						}, 5000);
 					}
 				} else {
-					// No progress info from backend, check if we should hide
-					setProgressInfo((prevProgressInfo) => {
-						if (prevProgressInfo && !isProcessing) {
-							// Process is complete, hide after 2 seconds
-							if (hideTimeout) {
-								clearTimeout(hideTimeout);
-							}
-							hideTimeout = setTimeout(() => {
-								setProgressInfo(null);
-								setIsVisible(false);
-							}, 2000);
-							return prevProgressInfo; // Keep showing current progress during countdown
-						}
-						return prevProgressInfo;
-					});
+					// No progress info available, stop polling
+					if (intervalId) {
+						clearInterval(intervalId);
+					}
+					setIsVisible(false);
+					setProgressInfo(null);
+					setIsCompleted(false);
 				}
 			} catch (error) {
 				console.error("Failed to fetch progress info:", error);
 			}
 		};
 
-		if (isProcessing || isVisible) {
-			// Start polling at 60 Hz when processing or still visible
+		if (isProcessing || (isVisible && !isCompleted)) {
+			// Start polling when processing or still visible and not completed
 			intervalId = setInterval(fetchProgress, 1000 / 60);
 			// Initial fetch
 			fetchProgress();
-		} else {
+		} else if (!(isProcessing || isVisible)) {
 			// Reset state when not processing and not visible
 			setProgressInfo(null);
-			setIsVisible(false);
+			setIsCompleted(false);
 		}
 
 		return () => {
 			if (intervalId) {
 				clearInterval(intervalId);
 			}
-			if (hideTimeout) {
-				clearTimeout(hideTimeout);
+		};
+	}, [isProcessing, isVisible, isCompleted]);
+
+	// Cleanup timeout on unmount
+	useEffect(() => {
+		return () => {
+			if (hideTimeoutRef.current) {
+				clearTimeout(hideTimeoutRef.current);
 			}
 		};
-	}, [isProcessing, isVisible]);
+	}, []);
 
 	if (!(isVisible && progressInfo)) {
 		return null;
