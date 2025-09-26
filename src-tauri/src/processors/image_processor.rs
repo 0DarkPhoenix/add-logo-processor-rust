@@ -1,6 +1,6 @@
 use crate::handlers::progress_handler::ProgressManager;
 use crate::media::image::{apply_image_format_specific_args, ffmpeg_logger};
-use crate::media::{Image, Logo};
+use crate::media::{Image, Logo, Resolution};
 use ffmpeg_sidecar::command::FfmpegCommand;
 use log::info;
 use std::error::Error;
@@ -55,7 +55,7 @@ pub fn process_image_batch(
 fn process_image_chunk(
     batch_data: &[(Image, PathBuf)],
     logo: Option<&Logo>,
-    target_resolution: &crate::media::types::Resolution,
+    target_resolution: &Resolution,
     target_file_type: &str,
 ) -> Result<(), Box<dyn Error>> {
     // Create output directories

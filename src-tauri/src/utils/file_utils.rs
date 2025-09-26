@@ -1,6 +1,7 @@
+use remove_dir_all::remove_dir_all;
 use std::{
     error::Error,
-    fs::{create_dir_all, metadata, remove_dir_all},
+    fs::{create_dir_all, metadata},
     path::{Path, PathBuf},
 };
 
