@@ -10,12 +10,9 @@ interface AppLayoutProps {
 export function AppLayout({ children, currentPage, onPageChange }: AppLayoutProps) {
 	return (
 		<div className='min-h-screen bg-background flex flex-col'>
-			<header className='border-b border-border px-6 py-4 flex-shrink-0'>
-				<h1 className='text-2xl font-bold'>Add Logo Processor</h1>
-			</header>
 			{onPageChange && (
-				<nav className='border-b border-border px-6 py-3 flex-shrink-0'>
-					<div className='flex gap-2'>
+				<nav className=' px-6 py-3 flex-shrink-0'>
+					<div className='flex justify-center gap-8'>
 						<Button
 							variant={currentPage === "image" ? "default" : "outline"}
 							size='sm'
@@ -35,7 +32,7 @@ export function AppLayout({ children, currentPage, onPageChange }: AppLayoutProp
 					</div>
 				</nav>
 			)}
-			<main className='flex-1 px-6 py-8 overflow-auto'>
+			<main className='flex-1 px-6 overflow-auto'>
 				<div className='container mx-auto h-full'>{children}</div>
 			</main>
 		</div>
