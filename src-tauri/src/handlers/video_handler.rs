@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
 use walkdir::WalkDir;
 
+use crate::handlers::progress_handler::ProgressManager;
 use crate::utils::{clear_and_create_folder, get_relative_path};
 use crate::{
     handlers::handle_logos,
@@ -18,6 +19,8 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
     let mut video_list = Vec::new();
 
     let start_time = std::time::Instant::now();
+
+    ProgressManager::start_progress_with_terminal("Reading videos... (Step 1/5)".to_string(), None);
 
     if video_settings.clear_files_output_directory || !output_directory.exists() {
         let clear_folder_time = std::time::Instant::now();
@@ -38,11 +41,13 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
     println!("Reading videos took: {:?}", read_videos_time.elapsed());
 
     if video_list.is_empty() {
+        ProgressManager::set_status("No videos found in the input directory".to_string());
         println!("No videos found in the input directory, returning early.");
         println!("Total time: {:?}", start_time.elapsed());
         return Ok(());
     }
 
+    ProgressManager::set_status("Sorting videos by file size... (Step 2/5)".to_string());
     let sort_start = std::time::Instant::now();
     sort_list_by_file_size(&mut video_list);
     println!(
@@ -50,6 +55,7 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
         sort_start.elapsed()
     );
 
+    ProgressManager::set_status("Applying video settings... (Step 3/5)".to_string());
     let apply_settings_start = std::time::Instant::now();
     apply_video_settings_per_video(video_settings, &mut video_list);
     println!(
@@ -57,6 +63,7 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
         apply_settings_start.elapsed()
     );
 
+    ProgressManager::set_status("Processing logos... (Step 4/5)".to_string());
     let logo_processing_start = std::time::Instant::now();
     let logo_list = process_logos_for_video_resolutions(video_settings, &video_list)?;
     println!(
@@ -64,6 +71,8 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
         logo_processing_start.elapsed()
     );
 
+    ProgressManager::set_status("Processing videos... (Step 5/5)".to_string());
+    ProgressManager::set_total(video_list.len());
     let video_processing_start = std::time::Instant::now();
     process_videos_from_video_list(
         output_directory,
@@ -72,6 +81,9 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
         video_settings,
         input_directory,
     )?;
+
+    ProgressManager::finish_progress();
+
     println!(
         "Processing videos took: {:?}",
         video_processing_start.elapsed()
@@ -83,8 +95,8 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
 }
 
 /// Apply the video settings per video in parallel
-fn apply_video_settings_per_video(video_settings: &VideoSettings, video_list: &mut Vec<Video>) {
-    video_list.par_iter_mut().for_each(|video| {
+fn apply_video_settings_per_video(video_settings: &VideoSettings, video_list: &mut [Video]) {
+    video_list.iter_mut().par_bridge().for_each(|video| {
         video.resize_dimensions(&video_settings.min_pixel_count);
         video.file_type = video_settings.format.clone();
         video.codec = video_settings.codec.clone();
@@ -129,11 +141,17 @@ fn process_videos_from_video_list(
                     output_directory.to_path_buf()
                 };
 
+            ProgressManager::redraw_progress();
+
             process_video(&video, logo, &final_output_directory).map_err(
                 |e| -> Box<dyn Error + Send + Sync> {
                     format!("Failed to process video: {}", e).into()
                 },
-            )
+            )?;
+
+            ProgressManager::increment_progress(Some(1));
+
+            Ok(())
         },
     )?;
     Ok(())

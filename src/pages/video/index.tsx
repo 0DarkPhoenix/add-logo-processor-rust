@@ -58,7 +58,7 @@ export default function VideoProcessingPage() {
 	const onSubmit = async (data: VideoSettings) => {
 		setIsProcessing(true);
 		try {
-			await invoke("process_videos", { imageSettings: data });
+			await invoke("process_videos", { videoSettings: data });
 		} catch (error) {
 			console.error("Processing failed:", error);
 		} finally {

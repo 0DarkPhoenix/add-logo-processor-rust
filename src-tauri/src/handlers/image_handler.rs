@@ -221,6 +221,8 @@ fn process_images_from_image_list(
                 },
             )?;
 
+            ProgressManager::increment_progress(Some(batch_data.len()));
+
             Ok(())
         },
     )?;

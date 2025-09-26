@@ -1,4 +1,3 @@
-use crate::handlers::progress_handler::ProgressManager;
 use crate::media::image::{apply_image_format_specific_args, ffmpeg_logger};
 use crate::media::{Image, Logo, Resolution};
 use ffmpeg_sidecar::command::FfmpegCommand;
@@ -129,8 +128,6 @@ fn process_image_chunk(
     // Execute the command
     let ffmpeg_child = cmd.spawn()?;
     ffmpeg_logger(ffmpeg_child)?;
-
-    ProgressManager::increment_progress(Some(batch_data.len()));
 
     Ok(())
 }
