@@ -2,6 +2,7 @@ use crate::media::image::ffmpeg_logger;
 use crate::media::{Logo, Video};
 use ffmpeg_sidecar::command::FfmpegCommand;
 use std::error::Error;
+use std::fs::create_dir_all;
 use std::path::Path;
 
 pub fn process_video(
@@ -9,8 +10,14 @@ pub fn process_video(
     logo: Option<&Logo>,
     output_directory: &Path,
 ) -> Result<(), Box<dyn Error>> {
+    // Create output directories
+    create_dir_all(output_directory)?;
+
     // Start building the ffmpeg command
     let mut cmd = FfmpegCommand::new();
+
+    #[cfg(target_os = "windows")]
+    cmd.hide_banner();
 
     // Input video file
     cmd.input(video.file_path.to_str().ok_or("Invalid video file path")?);
@@ -25,16 +32,7 @@ pub fn process_video(
         );
     }
 
-    // Build output file path
-    let output_file = output_directory.join(
-        video
-            .file_path
-            .file_name()
-            .ok_or("Invalid video file name")?,
-    );
-
     // Build filter complex for video processing
-
     if let Some(logo) = logo {
         // Scale video and overlay logo in one filter complex
         let filter_complex = format!(
@@ -64,7 +62,18 @@ pub fn process_video(
     cmd.args(["-crf", "23"]); // Good quality/size balance
     cmd.args(["-preset", "medium"]); // Encoding speed vs compression
 
-    // Set output file
+    // Add output mappings and files
+    let file_stem = video
+        .file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or("Invalid file name")?;
+
+    let target_file_type = &video.file_type;
+
+    let new_filename = format!("{}.{}", file_stem, target_file_type);
+    let output_file = output_directory.join(new_filename);
+
     cmd.output(output_file.to_str().ok_or("Invalid output file path")?);
 
     // Overwrite output file if it exists
