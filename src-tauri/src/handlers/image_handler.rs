@@ -147,7 +147,7 @@ fn process_images_from_image_list(
     let total_images = batches.values().map(|v| v.len()).sum::<usize>();
 
     // Using more batches for better thread utilization
-    // After much testing, the optimal number of batches seems to be 2 times the number of CPU cores
+    // After much testing, the optimal number of batches is 2 times the number of CPU threads
     // * 1.5 = +5.08%
     // * 1.75 = +0.86%
     // * 2 = 0% - benchmark

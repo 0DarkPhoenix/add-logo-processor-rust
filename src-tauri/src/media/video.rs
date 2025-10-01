@@ -1,4 +1,5 @@
 use crate::{
+    formats::video_format_types::VIDEO_FORMAT_REGISTRY,
     media::Media,
     utils::{read_file_size, read_file_type},
 };
@@ -104,58 +105,6 @@ pub mod video_codec_strings {
     pub const ZMBV: &str = "zmbv";
 }
 
-pub mod video_format_strings {
-    pub const THREE_G2: &str = "3g2";
-    pub const THREE_GP: &str = "3gp";
-    pub const A64: &str = "a64";
-    pub const ADTS: &str = "adts";
-    pub const AMV: &str = "amv";
-    pub const ASF: &str = "asf";
-    pub const AVI: &str = "avi";
-    pub const AVIF: &str = "avif";
-    pub const SWF: &str = "swf";
-    pub const TXT: &str = "txt";
-    pub const CRC: &str = "crc";
-    pub const MPD: &str = "mpd";
-    pub const VOB: &str = "vob";
-    pub const F4V: &str = "f4v";
-    pub const FIFO: &str = "fifo";
-    pub const FLV: &str = "flv";
-    pub const HASH: &str = "hash";
-    pub const MD5: &str = "md5";
-    pub const GIF: &str = "gif";
-    pub const F4M: &str = "f4m";
-    pub const M3U8: &str = "m3u8";
-    pub const JPG: &str = "jpg";
-    pub const M4V: &str = "m4v";
-    pub const ISMV: &str = "ismv";
-    pub const LATM: &str = "latm";
-    pub const MKV: &str = "mkv";
-    pub const MOV: &str = "mov";
-    pub const MP2: &str = "mp2";
-    pub const MP4: &str = "mp4";
-    pub const MPG: &str = "mpg";
-    pub const M1V: &str = "m1v";
-    pub const M2V: &str = "m2v";
-    pub const TS: &str = "ts";
-    pub const MJPG: &str = "mjpg";
-    pub const MXF: &str = "mxf";
-    pub const NULL: &str = "null";
-    pub const OGA: &str = "oga";
-    pub const OGV: &str = "ogv";
-    pub const OPUS: &str = "opus";
-    pub const RTP: &str = "rtp";
-    pub const RTSP: &str = "rtsp";
-    pub const SAP: &str = "sap";
-    pub const SDL: &str = "sdl";
-    pub const ISM: &str = "ism";
-    pub const SPX: &str = "spx";
-    pub const TEE: &str = "tee";
-    pub const TTML: &str = "ttml";
-    pub const WEBM: &str = "webm";
-    pub const WEBP: &str = "webp";
-}
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Video {
     pub file_path: PathBuf,
@@ -255,62 +204,9 @@ impl Media for Video {
 fn read_video_file_type(file_path: &std::path::Path) -> Result<String, Box<dyn Error>> {
     let file_type = read_file_type(file_path);
 
-    // Check if the file type is present in the video format strings list
-    let supported_formats = [
-        video_format_strings::THREE_G2,
-        video_format_strings::THREE_GP,
-        video_format_strings::A64,
-        video_format_strings::ADTS,
-        video_format_strings::AMV,
-        video_format_strings::ASF,
-        video_format_strings::AVI,
-        video_format_strings::AVIF,
-        video_format_strings::SWF,
-        video_format_strings::TXT,
-        video_format_strings::CRC,
-        video_format_strings::MPD,
-        video_format_strings::VOB,
-        video_format_strings::F4V,
-        video_format_strings::FIFO,
-        video_format_strings::FLV,
-        video_format_strings::HASH,
-        video_format_strings::MD5,
-        video_format_strings::GIF,
-        video_format_strings::F4M,
-        video_format_strings::M3U8,
-        video_format_strings::JPG,
-        video_format_strings::M4V,
-        video_format_strings::ISMV,
-        video_format_strings::LATM,
-        video_format_strings::MKV,
-        video_format_strings::MOV,
-        video_format_strings::MP2,
-        video_format_strings::MP4,
-        video_format_strings::MPG,
-        video_format_strings::M1V,
-        video_format_strings::M2V,
-        video_format_strings::TS,
-        video_format_strings::MJPG,
-        video_format_strings::MXF,
-        video_format_strings::NULL,
-        video_format_strings::OGA,
-        video_format_strings::OGV,
-        video_format_strings::OPUS,
-        video_format_strings::RTP,
-        video_format_strings::RTSP,
-        video_format_strings::SAP,
-        video_format_strings::SDL,
-        video_format_strings::ISM,
-        video_format_strings::SPX,
-        video_format_strings::TEE,
-        video_format_strings::TTML,
-        video_format_strings::WEBM,
-        video_format_strings::WEBP,
-    ];
-
-    if supported_formats.contains(&file_type.as_str()) {
+    if VIDEO_FORMAT_REGISTRY.is_supported_for_reading(file_type.as_str()) {
         Ok(file_type)
     } else {
-        Err(format!("Unsupported video format: {}", file_type).into())
+        Err(format!("Unsupported video format for reading: {}", file_type).into())
     }
 }

@@ -6,6 +6,7 @@ pub use handlers::progress_handler::ProgressInfo;
 pub use media::Corner;
 pub use utils::config::{AppConfig, ImageSettings, VideoSettings};
 
+mod codecs;
 mod commands;
 mod formats;
 mod handlers;

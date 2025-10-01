@@ -5,8 +5,9 @@ use std::{error::Error, fs};
 use tauri::{AppHandle, Manager};
 use ts_rs::TS;
 
+use crate::codecs::video_codec_types::video_codec;
 use crate::formats::image_format_types::image_format;
-use crate::media::video::{video_codec_strings, video_format_strings};
+use crate::formats::video_format_types::video_format;
 use crate::media::Corner;
 
 /// Custom serialization for `PathBuf`
@@ -185,9 +186,9 @@ impl Default for AppConfig {
                 logo_y_offset_scale: 0,
                 logo_corner: Corner::TopLeft,
                 should_convert_format: false,
-                format: video_format_strings::MP4.to_string(),
+                format: video_format::MP4.extensions[0].to_string(),
                 should_convert_codec: false,
-                codec: video_codec_strings::H264.to_string(),
+                codec: video_codec::H264.name.to_string(),
                 clear_files_input_directory: false,
                 clear_files_output_directory: false,
                 overwrite_existing_files_output_directory: false,

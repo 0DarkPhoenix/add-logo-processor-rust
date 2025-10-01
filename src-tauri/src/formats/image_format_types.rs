@@ -1,30 +1,8 @@
 use std::collections::HashMap;
 
-use crate::formats::format::FormatSupport;
+use crate::formats::format::{Format, FormatSupport};
 
-#[derive(Debug, Clone)]
-pub struct ImageFormat {
-    pub name: &'static str,
-    pub extensions: &'static [&'static str],
-    pub support: FormatSupport,
-    pub description: &'static str,
-}
-
-impl ImageFormat {
-    pub const fn new(
-        name: &'static str,
-        extensions: &'static [&'static str],
-        support: FormatSupport,
-        description: &'static str,
-    ) -> Self {
-        Self {
-            name,
-            extensions,
-            support,
-            description,
-        }
-    }
-}
+pub type ImageFormat = Format;
 
 pub mod image_format {
     use super::{FormatSupport, ImageFormat};

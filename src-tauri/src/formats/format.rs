@@ -1,7 +1,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FormatSupport {
-    pub demuxing: bool, // Can read/decode this format
-    pub muxing: bool,   // Can write/encode this format
+    pub demuxing: bool, // read/decode
+    pub muxing: bool,   // write/encode
 }
 
 impl FormatSupport {
@@ -23,5 +23,29 @@ impl FormatSupport {
 
     pub const fn unsupported() -> Self {
         Self::new(false, false)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Format {
+    pub name: &'static str,
+    pub extensions: &'static [&'static str],
+    pub support: FormatSupport,
+    pub description: &'static str,
+}
+
+impl Format {
+    pub const fn new(
+        name: &'static str,
+        extensions: &'static [&'static str],
+        support: FormatSupport,
+        description: &'static str,
+    ) -> Self {
+        Self {
+            name,
+            extensions,
+            support,
+            description,
+        }
     }
 }
