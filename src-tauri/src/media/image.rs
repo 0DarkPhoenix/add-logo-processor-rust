@@ -1,5 +1,6 @@
 use crate::{
     formats::image_format_types::{image_format, IMAGE_FORMAT_REGISTRY},
+    handlers::process_handler::ProcessManager,
     utils::{read_file_size, read_file_type},
 };
 use ffmpeg_sidecar::{child::FfmpegChild, command::FfmpegCommand, event::FfmpegEvent};
@@ -161,38 +162,44 @@ fn handle_resize_to_ico_format(
         .output(output_path.to_str().ok_or("Invalid output path")?)
         .spawn()?;
 
-    ffmpeg_logger(ffmpeg_child)?;
-
-    Ok(())
+    ffmpeg_logger(ffmpeg_child)
 }
 
+/// Logger that processes FFmpeg events and waits for completion
 pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error>> {
+    // Get the system PID from the child process
+    let pid = ffmpeg_child.as_inner().id();
+
+    // Register the process by its PID
+    let process_id = ProcessManager::register_process_by_pid(pid);
+
     let mut error_messages = Vec::new();
     let mut log_messages = Vec::new();
-    ffmpeg_child.iter()?.for_each(|event| {
-        match event {
-            FfmpegEvent::Log(log_level, message) => {
-                log_messages.push(format!("{:?}: {}", log_level, message));
-                // Collect error and warning messages
-                match log_level {
-                    ffmpeg_sidecar::event::LogLevel::Error
-                    | ffmpeg_sidecar::event::LogLevel::Fatal => {
-                        error_messages.push(message);
-                    }
-                    _ => {}
+
+    ffmpeg_child.iter()?.for_each(|event| match event {
+        FfmpegEvent::Log(log_level, message) => {
+            log_messages.push(format!("{:?}: {}", log_level, message));
+            match log_level {
+                ffmpeg_sidecar::event::LogLevel::Error | ffmpeg_sidecar::event::LogLevel::Fatal => {
+                    error_messages.push(message);
                 }
+                _ => {}
             }
-            FfmpegEvent::Error(error) => {
-                error_messages.push(error);
-            }
-            FfmpegEvent::Done => {
-                println!("FFmpeg image processing completed successfully");
-            }
-            _ => {}
         }
+        FfmpegEvent::Error(error) => {
+            error_messages.push(error);
+        }
+        FfmpegEvent::Done => {
+            println!("FFmpeg image processing completed successfully");
+        }
+        _ => {}
     });
+
     let output = ffmpeg_child.wait()?;
-    let _: () = if !output.success() {
+
+    ProcessManager::unregister_process(process_id);
+
+    if !output.success() {
         let error_message = if !error_messages.is_empty() {
             format!(
                 "FFmpeg command failed with exit code: {:?}\n\nErrors:\n{}",
@@ -210,6 +217,7 @@ pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error>
         };
 
         return Err(error_message.into());
-    };
+    }
+
     Ok(())
 }

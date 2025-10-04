@@ -1,5 +1,5 @@
 use ffmpeg_sidecar::download::auto_download;
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Manager, RunEvent};
 use tauri_plugin_log::{Target, TargetKind};
 // Re-export types for ts-rs
 pub use handlers::progress_handler::ProgressInfo;
@@ -57,6 +57,15 @@ pub fn run() {
             commands::process_images,
             commands::process_videos
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app_handle, event| {
+            // Handle app exit events
+            if let RunEvent::Exit = event {
+                log::info!("Application is exiting, cleaning up FFmpeg processes...");
+                if let Err(e) = handlers::process_handler::ProcessManager::kill_all_processes() {
+                    log::error!("Failed to kill FFmpeg processes on exit: {}", e);
+                }
+            }
+        });
 }

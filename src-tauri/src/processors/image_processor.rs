@@ -125,9 +125,7 @@ fn process_image_chunk(
         cmd.output(output_file.to_str().ok_or("Invalid output file path")?);
     }
 
-    // Execute the command
     let ffmpeg_child = cmd.spawn()?;
-    ffmpeg_logger(ffmpeg_child)?;
 
-    Ok(())
+    ffmpeg_logger(ffmpeg_child)
 }

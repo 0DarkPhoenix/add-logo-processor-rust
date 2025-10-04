@@ -79,9 +79,7 @@ pub fn process_video(
     // Overwrite output file if it exists
     cmd.overwrite();
 
-    // Execute the command
     let ffmpeg_child = cmd.spawn()?;
-    ffmpeg_logger(ffmpeg_child)?;
 
-    Ok(())
+    ffmpeg_logger(ffmpeg_child)
 }

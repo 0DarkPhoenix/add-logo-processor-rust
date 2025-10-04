@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
 use walkdir::WalkDir;
 
+use crate::handlers::process_handler::ProcessManager;
 use crate::handlers::progress_handler::ProgressManager;
 use crate::utils::{clear_and_create_folder, get_relative_path};
 use crate::{
@@ -15,6 +16,9 @@ use crate::{
 };
 
 pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Clear any previous processes at the start
+    ProcessManager::clear();
+
     let input_directory = &image_settings.input_directory;
     let output_directory = &image_settings.output_directory;
 
