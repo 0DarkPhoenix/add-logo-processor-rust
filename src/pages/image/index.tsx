@@ -81,7 +81,7 @@ export default function ImageProcessingPage() {
 						<LogoConfiguratorCard />
 
 						<Button type='submit' variant='default' disabled={isProcessing}>
-							{isProcessing ? "Processing..." : "Process Images"}
+							{isProcessing ? "Cancel processing" : "Process Images"}
 						</Button>
 					</form>
 				</Form>

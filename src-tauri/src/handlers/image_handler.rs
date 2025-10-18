@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
 use walkdir::WalkDir;
 
+use crate::formats::image_format_types::IMAGE_FORMAT_REGISTRY;
 use crate::handlers::process_handler::ProcessManager;
 use crate::handlers::progress_handler::ProgressManager;
 use crate::utils::{clear_and_create_folder, get_relative_path};
@@ -407,24 +408,7 @@ fn write_to_output_directory(
 
 fn is_supported_image_extension(path: &Path) -> bool {
     if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
-        matches!(
-            extension.to_lowercase().as_str(),
-            "png"
-                | "jpg"
-                | "jpeg"
-                | "webp"
-                | "bmp"
-                | "gif"
-                | "tiff"
-                | "ico"
-                | "pnm"
-                | "tga"
-                | "hdr"
-                | "exr"
-                | "ff"
-                | "avif"
-                | "qoi"
-        )
+        IMAGE_FORMAT_REGISTRY.is_supported_for_reading(extension)
     } else {
         false
     }

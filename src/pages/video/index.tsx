@@ -81,7 +81,7 @@ export default function VideoProcessingPage() {
 						<LogoConfiguratorCard />
 
 						<Button type='submit' variant='default' disabled={isProcessing}>
-							{isProcessing ? "Processing..." : "Process Videos"}
+							{isProcessing ? "Cancel processing" : "Process Videos"}
 						</Button>
 					</form>
 				</Form>

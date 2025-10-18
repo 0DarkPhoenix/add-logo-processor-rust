@@ -1,4 +1,5 @@
 use remove_dir_all::remove_dir_all;
+use std::fs::{read_dir, remove_file};
 use std::{
     error::Error,
     fs::{create_dir_all, metadata},
@@ -20,15 +21,31 @@ pub fn read_file_type(file_path: &Path) -> String {
 
 /// Clear all files and folders in the folder from the specified path.
 ///
-/// Instead of deleting all entries inside a folder, this function deletes the folder itself when it exists.
-/// Because the folder is (re-)created in the last step, it can also be used to create a folder when it doesn't exist yet.
+/// This function clears the contents of a folder without deleting the folder itself,
+/// which is significantly faster than deleting and recreating the directory.
 pub fn clear_and_create_folder(folder_path: &Path) -> Result<(), Box<dyn Error>> {
     if folder_path.exists() {
-        remove_dir_all(folder_path)?;
+        // Clear contents instead of deleting the directory
+        clear_directory_contents(folder_path)?;
+    } else {
+        create_dir_all(folder_path)?;
     }
 
-    create_dir_all(folder_path)?;
+    Ok(())
+}
 
+/// Recursively clear all contents of a directory without deleting the directory itself
+fn clear_directory_contents(dir_path: &Path) -> Result<(), Box<dyn Error>> {
+    for entry in read_dir(dir_path)? {
+        let entry = entry?;
+        let path = entry.path();
+
+        if path.is_dir() {
+            remove_dir_all(&path)?;
+        } else {
+            remove_file(&path)?;
+        }
+    }
     Ok(())
 }
 

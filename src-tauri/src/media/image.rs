@@ -3,7 +3,8 @@ use crate::{
     handlers::process_handler::ProcessManager,
     utils::{read_file_size, read_file_type},
 };
-use ffmpeg_sidecar::{child::FfmpegChild, command::FfmpegCommand, event::FfmpegEvent};
+use ffmpeg_sidecar::{child::FfmpegChild, command::FfmpegCommand};
+use log::error;
 use std::{
     error::Error,
     path::{Path, PathBuf},
@@ -167,56 +168,57 @@ fn handle_resize_to_ico_format(
 
 /// Logger that processes FFmpeg events and waits for completion
 pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error>> {
-    // Get the system PID from the child process
+    // Get PID immediately but don't register yet
     let pid = ffmpeg_child.as_inner().id();
 
-    // Register the process by its PID
+    // Register process without blocking - just store the PID
     let process_id = ProcessManager::register_process_by_pid(pid);
 
-    let mut error_messages = Vec::new();
-    let mut log_messages = Vec::new();
+    // Process FFmpeg output without holding any locks
+    let result = process_ffmpeg_output(&mut ffmpeg_child);
 
-    ffmpeg_child.iter()?.for_each(|event| match event {
-        FfmpegEvent::Log(log_level, message) => {
-            log_messages.push(format!("{:?}: {}", log_level, message));
-            match log_level {
-                ffmpeg_sidecar::event::LogLevel::Error | ffmpeg_sidecar::event::LogLevel::Fatal => {
-                    error_messages.push(message);
-                }
-                _ => {}
-            }
-        }
-        FfmpegEvent::Error(error) => {
-            error_messages.push(error);
-        }
-        FfmpegEvent::Done => {
-            println!("FFmpeg image processing completed successfully");
-        }
-        _ => {}
-    });
-
-    let output = ffmpeg_child.wait()?;
-
+    // Unregister after completion
     ProcessManager::unregister_process(process_id);
 
-    if !output.success() {
-        let error_message = if !error_messages.is_empty() {
-            format!(
-                "FFmpeg command failed with exit code: {:?}\n\nErrors:\n{}",
-                output.code(),
-                error_messages.join("\n")
-            )
-        } else if !log_messages.is_empty() {
-            format!(
-                "FFmpeg command failed with exit code: {:?}\n\nLogs:\n{}",
-                output.code(),
-                log_messages.join("\n")
-            )
-        } else {
-            format!("FFmpeg command failed with exit code: {:?}", output.code())
-        };
+    result
+}
 
-        return Err(error_message.into());
+/// Process FFmpeg output without any mutex operations
+fn process_ffmpeg_output(ffmpeg_child: &mut FfmpegChild) -> Result<(), Box<dyn Error>> {
+    // Iterate over FFmpeg output events
+    for event in ffmpeg_child.iter()? {
+        match event {
+            ffmpeg_sidecar::event::FfmpegEvent::Log(level, msg) => {
+                match level {
+                    ffmpeg_sidecar::event::LogLevel::Error
+                    | ffmpeg_sidecar::event::LogLevel::Fatal => {
+                        error!("FFmpeg: {}", msg);
+                    }
+                    _ => {
+                        // Only log warnings and above to reduce overhead
+                        if matches!(level, ffmpeg_sidecar::event::LogLevel::Warning) {
+                            // info!("FFmpeg: {}", msg);
+                        }
+                    }
+                }
+            }
+            ffmpeg_sidecar::event::FfmpegEvent::Progress(progress) => {
+                // Optionally log progress at intervals
+                // Consider removing this entirely for maximum performance
+                // dbg!("FFmpeg: {}", progress);
+            }
+            ffmpeg_sidecar::event::FfmpegEvent::Done => {
+                break;
+            }
+            _ => {}
+        }
+    }
+
+    // Wait for the process to complete
+    let output = ffmpeg_child.wait()?;
+
+    if !output.success() {
+        return Err(format!("FFmpeg process failed with exit code: {:?}", output.code()).into());
     }
 
     Ok(())

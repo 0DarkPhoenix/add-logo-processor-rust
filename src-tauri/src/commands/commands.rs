@@ -1,6 +1,7 @@
 use crate::{
     handlers::{
         handle_images, handle_videos,
+        process_handler::ProcessManager,
         progress_handler::{ProgressInfo, ProgressManager},
     },
     utils::AppConfig,
@@ -16,6 +17,13 @@ pub fn load_config() -> Result<AppConfig, String> {
 #[tauri::command]
 pub fn get_progress_info() -> Result<Option<ProgressInfo>, String> {
     Ok(ProgressManager::get_progress())
+}
+
+#[tauri::command]
+pub fn kill_all_processes() -> Result<(), String> {
+    ProcessManager::kill_all_processes().map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command(async)]
