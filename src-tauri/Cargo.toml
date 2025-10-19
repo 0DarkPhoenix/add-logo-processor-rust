@@ -26,6 +26,7 @@
 [dependencies]
     ffmpeg-sidecar     ="2.2.0"
     imagesize          ="0.14.0"
+jwalk = "0.8.1"
     lazy_static        ="1.5.0"
     log                ="0.4.28"
     num_cpus           ="1.17"

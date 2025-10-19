@@ -3,7 +3,6 @@ use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
-use walkdir::WalkDir;
 
 use crate::formats::image_format_types::IMAGE_FORMAT_REGISTRY;
 use crate::handlers::process_handler::ProcessManager;
@@ -414,33 +413,49 @@ fn is_supported_image_extension(path: &Path) -> bool {
     }
 }
 
-/// Recursively read all images from child directories in parallel
+/// Recursively read all images from child directories in parallel using jwalk
 fn read_images_recursive_parallel(
     directory: &Path,
     image_list: &mut Vec<Image>,
     output_directory: &Path,
     image_settings: &ImageSettings,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let walkdir_paths = WalkDir::new(directory).into_iter().filter_map(|entry| {
-        let entry = entry.ok()?;
-        let path = entry.path();
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
-    });
+    let walk_start = std::time::Instant::now();
 
-    let valid_image_paths = filter_valid_image_paths(
-        walkdir_paths,
-        directory, // Use directory as input_directory for recursive case
-        output_directory,
-        image_settings,
+    // Use jwalk for parallel directory walking with inline filtering
+    let valid_image_paths: Vec<PathBuf> = jwalk::WalkDir::new(directory)
+        .skip_hidden(false)
+        .into_iter()
+        .filter_map(|entry| {
+            let entry = entry.ok()?;
+            let path = entry.path();
+
+            if !path.is_file() {
+                return None;
+            }
+
+            if !is_supported_image_extension(&path) {
+                return None;
+            }
+
+            if !write_to_output_directory(&path, directory, output_directory, image_settings) {
+                return None;
+            }
+
+            Some(path)
+        })
+        .collect();
+
+    info!(
+        "Directory walk and filtering took: {:?}",
+        walk_start.elapsed()
     );
+    info!("Found {} valid image paths", valid_image_paths.len());
 
-    info!("Found {} image files to process", valid_image_paths.len());
-
+    let image_creation_start = std::time::Instant::now();
     let images = create_images_from_paths_parallel(&valid_image_paths);
+    info!("Image creation took: {:?}", image_creation_start.elapsed());
+
     image_list.extend(images);
 
     Ok(())

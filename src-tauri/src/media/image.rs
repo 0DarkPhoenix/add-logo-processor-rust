@@ -74,6 +74,23 @@ fn read_image_file_type(file_path: &Path) -> Result<String, Box<dyn Error>> {
 }
 
 pub fn read_image_resolution(path: &Path) -> Result<Resolution, Box<dyn Error>> {
+    // Check if the file is an SVG
+    let extension = path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+
+    if image_format::SVG.extensions.contains(&extension.as_str()) {
+        // SVG files are vector format - use a default resolution
+        // FFmpeg will handle the actual rendering at the target size
+        return Ok(Resolution {
+            width: 1920,
+            height: 1080,
+        });
+    }
+
+    // For non-SVG images, use imagesize
     let dimensions =
         imagesize::size(path).map_err(|e| format!("Failed to read image dimensions: {}", e))?;
 
