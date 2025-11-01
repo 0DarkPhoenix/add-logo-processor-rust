@@ -116,7 +116,7 @@ pub struct Video {
 }
 
 impl Video {
-    pub fn new(path: PathBuf) -> Result<Self, Box<dyn Error>> {
+    pub fn new(path: PathBuf) -> Result<Self, Box<dyn Error + Send + Sync>> {
         let file_size = read_file_size(&path)?;
 
         // Get file type from extension and validate it's supported by FFmpeg
@@ -201,7 +201,9 @@ impl Media for Video {
 }
 
 /// Read the video file type and validate it's supported by FFmpeg
-fn read_video_file_type(file_path: &std::path::Path) -> Result<String, Box<dyn Error>> {
+fn read_video_file_type(
+    file_path: &std::path::Path,
+) -> Result<String, Box<dyn Error + Send + Sync>> {
     let file_type = read_file_type(file_path);
 
     if VIDEO_FORMAT_REGISTRY.is_supported_for_reading(file_type.as_str()) {

@@ -7,7 +7,10 @@ use crate::media::{
     Logo, Resolution,
 };
 
-pub fn process_logo(logo: &mut Logo, output_directory: &Path) -> Result<(), Box<dyn Error>> {
+pub fn process_logo(
+    logo: &mut Logo,
+    output_directory: &Path,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     let file_stem = logo.file_path.file_stem().unwrap().to_str().unwrap();
     let file_extension = logo.file_path.extension().unwrap().to_str().unwrap();
     let new_filename = format!(
@@ -34,7 +37,7 @@ fn resize_logo(
     input_path: &std::path::PathBuf,
     output_path: &std::path::PathBuf,
     resolution: &Resolution,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Check if resizing is needed
     let current_resolution = read_image_resolution(input_path)?;
     if current_resolution.width == resolution.width

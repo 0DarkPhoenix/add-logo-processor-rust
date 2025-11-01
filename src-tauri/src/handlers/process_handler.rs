@@ -1,18 +1,22 @@
 use log::{info, warn};
 use std::collections::HashMap;
 use std::error::Error;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+
+use crate::handlers::progress_handler::ProgressManager;
 
 lazy_static::lazy_static! {
     pub static ref PROCESS_MANAGER: Arc<Mutex<ProcessManager>> = Arc::new(Mutex::new(ProcessManager::new()));
 }
 
 pub struct ProcessManager {
-    pub process_ids: HashMap<u64, u32>, // Map our ID to system PID
+    pub process_ids: HashMap<u64, u32>,
     next_id: u64,
+    cancel_flag: Arc<AtomicBool>,
 }
 
 impl ProcessManager {
@@ -20,17 +24,18 @@ impl ProcessManager {
         Self {
             process_ids: HashMap::new(),
             next_id: 0,
+            cancel_flag: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    /// Register a new FFmpeg process by its system PID and return its unique ID
+    /// Register a new process by its system PID and return its unique ID
     pub fn register_process_by_pid(pid: u32) -> u64 {
         let mut manager = PROCESS_MANAGER.lock().unwrap();
         let id = manager.next_id;
         manager.next_id += 1;
         manager.process_ids.insert(id, pid);
         info!(
-            "Registered FFmpeg process with ID {} (PID: {}). Total active: {}",
+            "Registered process with ID {} (PID: {}). Total active: {}",
             id,
             pid,
             manager.process_ids.len()
@@ -43,7 +48,7 @@ impl ProcessManager {
         let mut manager = PROCESS_MANAGER.lock().unwrap();
         if let Some(pid) = manager.process_ids.remove(&id) {
             info!(
-                "Unregistered FFmpeg process with ID {} (PID: {}). Remaining: {}",
+                "Unregistered process with ID {} (PID: {}). Remaining: {}",
                 id,
                 pid,
                 manager.process_ids.len()
@@ -56,20 +61,33 @@ impl ProcessManager {
         }
     }
 
-    /// Kill all active FFmpeg processes immediately using OS-level termination
+    /// Request cancellation of all operations
+    pub fn request_cancel() {
+        let manager = PROCESS_MANAGER.lock().unwrap();
+        manager.cancel_flag.store(true, Ordering::Relaxed);
+        info!("Cancellation requested for all operations");
+    }
+
+    /// Check if cancellation has been requested
+    pub fn is_cancelled() -> bool {
+        let manager = PROCESS_MANAGER.lock().unwrap();
+        manager.cancel_flag.load(Ordering::Relaxed)
+    }
+
+    /// Kill all active processes immediately using OS-level termination
     pub fn kill_all_processes() -> Result<(), Box<dyn Error>> {
         let mut manager = PROCESS_MANAGER.lock().unwrap();
 
+        // Request cancellation
+        manager.cancel_flag.store(true, Ordering::Relaxed);
+
         let process_count = manager.process_ids.len();
         if process_count == 0 {
-            info!("No active FFmpeg processes to kill");
+            info!("No active processes to kill");
             return Ok(());
         }
 
-        info!(
-            "Forcefully killing {} active FFmpeg processes",
-            process_count
-        );
+        info!("Forcefully killing {} active processes", process_count);
 
         let mut errors = Vec::new();
         let mut killed_count = 0;
@@ -78,11 +96,11 @@ impl ProcessManager {
         for (id, pid) in manager.process_ids.iter() {
             match Self::kill_process_by_pid(*pid) {
                 Ok(_) => {
-                    info!("Successfully killed FFmpeg process {} (PID: {})", id, pid);
+                    info!("Successfully killed process {} (PID: {})", id, pid);
                     killed_count += 1;
                 }
                 Err(e) => {
-                    warn!("Failed to kill FFmpeg process {} (PID: {}): {}", id, pid, e);
+                    warn!("Failed to kill process {} (PID: {}): {}", id, pid, e);
                     errors.push(format!("Process {} (PID: {}): {}", id, pid, e));
                 }
             }
@@ -110,6 +128,9 @@ impl ProcessManager {
     pub fn clear() {
         let mut manager = PROCESS_MANAGER.lock().unwrap();
         manager.process_ids.clear();
+        // Reset the cancel flag when clearing
+        manager.cancel_flag.store(false, Ordering::Relaxed);
+        info!("Process manager cleared and cancel flag reset");
     }
 
     /// Get the count of active processes
@@ -149,4 +170,25 @@ impl ProcessManager {
         signal::kill(Pid::from_raw(pid as i32), Signal::SIGKILL)?;
         Ok(())
     }
+}
+
+/// Custom error type for cancellation
+#[derive(Debug)]
+pub struct CancellationError;
+
+impl std::fmt::Display for CancellationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Operation cancelled by user")
+    }
+}
+
+impl Error for CancellationError {}
+
+/// Check for cancellation and return an error if cancelled
+pub fn check_cancelled() -> Result<(), Box<dyn Error + Send + Sync>> {
+    if ProcessManager::is_cancelled() {
+        ProgressManager::set_status("Operation cancelled".to_string());
+        return Err(CancellationError.into());
+    }
+    Ok(())
 }

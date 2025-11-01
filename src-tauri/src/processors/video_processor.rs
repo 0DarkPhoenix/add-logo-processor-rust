@@ -9,7 +9,7 @@ pub fn process_video(
     video: &Video,
     logo: Option<&Logo>,
     output_directory: &Path,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Create output directories
     create_dir_all(output_directory)?;
 

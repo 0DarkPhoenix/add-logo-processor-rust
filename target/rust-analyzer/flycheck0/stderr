@@ -1,0 +1,156 @@
+   0.571069200s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint: stale: changed "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\utils\\file_utils.rs"
+   0.571098600s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint:           (vs) "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\target\\debug\\.fingerprint\\add-logo-processor-6153ea73bcb25ce9\\dep-lib-add_logo_processor_lib"
+   0.571104300s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 13406483288, nanos: 413793100 } < FileTime { seconds: 13406486031, nanos: 120193700 }
+   0.571482200s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint: fingerprint dirty for add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri)/Check { test: false }/TargetInner { ..: lib_target("add_logo_processor_lib", ["cdylib", "rlib", "staticlib"], "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\lib.rs", Edition2021) }
+   0.571510200s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\target\\debug\\.fingerprint\\add-logo-processor-6153ea73bcb25ce9\\dep-lib-add_logo_processor_lib", reference_mtime: FileTime { seconds: 13406483288, nanos: 413793100 }, stale: "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\utils\\file_utils.rs", stale_mtime: FileTime { seconds: 13406486031, nanos: 120193700 } }))
+   0.684572800s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint: stale: changed "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\utils\\file_utils.rs"
+   0.684587100s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint:           (vs) "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\target\\debug\\.fingerprint\\add-logo-processor-678a3dc925d3d39d\\dep-test-lib-add_logo_processor_lib"
+   0.684592500s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint:                FileTime { seconds: 13406483288, nanos: 414793700 } < FileTime { seconds: 13406486031, nanos: 120193700 }
+   0.684770500s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint: fingerprint dirty for add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri)/Check { test: true }/TargetInner { ..: lib_target("add_logo_processor_lib", ["cdylib", "rlib", "staticlib"], "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\lib.rs", Edition2021) }
+   0.684786900s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add_logo_processor_lib"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleItem(ChangedFile { reference: "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\target\\debug\\.fingerprint\\add-logo-processor-678a3dc925d3d39d\\dep-test-lib-add_logo_processor_lib", reference_mtime: FileTime { seconds: 13406483288, nanos: 414793700 }, stale: "C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\utils\\file_utils.rs", stale_mtime: FileTime { seconds: 13406486031, nanos: 120193700 } }))
+   0.686461000s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add-logo-processor"}: cargo::core::compiler::fingerprint: fingerprint dirty for add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri)/Check { test: false }/TargetInner { name: "add-logo-processor", doc: true, ..: with_path("C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\main.rs", Edition2021) }
+   0.686477800s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add-logo-processor"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "add_logo_processor_lib" })
+   0.687954700s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add-logo-processor"}: cargo::core::compiler::fingerprint: fingerprint dirty for add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri)/Check { test: true }/TargetInner { name: "add-logo-processor", doc: true, ..: with_path("C:\\Users\\sjoer\\Documents\\Tauri Projects\\add-logo-processor\\src-tauri\\src\\main.rs", Edition2021) }
+   0.687971000s  INFO prepare_target{force=true package_id=add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri) target="add-logo-processor"}: cargo::core::compiler::fingerprint:     dirty: FsStatusOutdated(StaleDepFingerprint { name: "add_logo_processor_lib" })
+    Checking add-logo-processor v0.0.1 (C:\Users\sjoer\Documents\Tauri Projects\add-logo-processor\src-tauri)
+warning: failed to parse serde attribute
+  | 
+  | serialize_with = "serialize_duration_as_secs"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with = "serialize_optional_duration_as_secs"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_optional_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_optional_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with = "serialize_duration_as_secs"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with = "serialize_optional_duration_as_secs"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_optional_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | serialize_with =
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+warning: failed to parse serde attribute
+  | 
+  | deserialize_with = "deserialize_optional_pathbuf"
+  | 
+  = note: ts-rs failed to parse this attribute. It will be ignored.
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.87s

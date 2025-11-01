@@ -54,6 +54,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::load_config,
             commands::get_progress_info,
+            commands::cancel_process,
             commands::process_images,
             commands::process_videos
         ])

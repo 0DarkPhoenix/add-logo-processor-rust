@@ -20,7 +20,12 @@ pub fn get_progress_info() -> Result<Option<ProgressInfo>, String> {
 }
 
 #[tauri::command]
-pub fn kill_all_processes() -> Result<(), String> {
+pub fn cancel_process() -> Result<(), String> {
+    ProcessManager::request_cancel();
+
+    // Wait a moment to make sure no new processes are created
+    std::thread::sleep(std::time::Duration::from_secs(1));
+
     ProcessManager::kill_all_processes().map_err(|e| e.to_string())?;
 
     Ok(())

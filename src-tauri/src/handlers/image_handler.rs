@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
 
 use crate::formats::image_format_types::IMAGE_FORMAT_REGISTRY;
-use crate::handlers::process_handler::ProcessManager;
+use crate::handlers::process_handler::{check_cancelled, ProcessManager};
 use crate::handlers::progress_handler::ProgressManager;
 use crate::utils::{clear_and_create_folder, get_relative_path};
 use crate::{
@@ -28,6 +28,8 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 
     ProgressManager::start_progress_with_terminal("Reading images... (Step 1/5)".to_string(), None);
 
+    check_cancelled()?;
+
     if image_settings.clear_files_output_directory || !output_directory.exists() {
         let clear_folder_time = std::time::Instant::now();
         clear_and_create_folder(output_directory).unwrap();
@@ -36,6 +38,8 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
             clear_folder_time.elapsed()
         );
     }
+
+    check_cancelled()?;
 
     let read_images_time = std::time::Instant::now();
     read_images_in_input_directory(
@@ -53,6 +57,8 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         return Ok(());
     }
 
+    check_cancelled()?;
+
     ProgressManager::set_status("Sorting images by file size... (Step 2/5)".to_string());
     let sort_start = std::time::Instant::now();
     sort_list_by_file_size(&mut image_list);
@@ -61,9 +67,11 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         sort_start.elapsed()
     );
 
+    check_cancelled()?;
+
     ProgressManager::set_status("Applying image settings... (Step 3/5)".to_string());
     let apply_settings_start = std::time::Instant::now();
-    apply_image_settings_per_image(image_settings, &mut image_list);
+    apply_image_settings_per_image(image_settings, &mut image_list)?;
     info!(
         "Applying image settings took: {:?}",
         apply_settings_start.elapsed()
@@ -76,6 +84,8 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         "Processing logos took: {:?}",
         logo_processing_start.elapsed()
     );
+
+    check_cancelled()?;
 
     ProgressManager::set_status("Processing images... (Step 5/5)".to_string());
     ProgressManager::set_total(image_list.len());
@@ -101,11 +111,24 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 }
 
 /// Apply the image settings per image in parallel
-fn apply_image_settings_per_image(image_settings: &ImageSettings, image_list: &mut Vec<Image>) {
-    image_list.par_iter_mut().for_each(|image| {
-        image.resize_dimensions(&image_settings.min_pixel_count);
-        image.file_type = image_settings.format.clone();
-    });
+fn apply_image_settings_per_image(
+    image_settings: &ImageSettings,
+    image_list: &mut Vec<Image>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    check_cancelled()?;
+
+    // Use try_for_each to allow early termination on cancellation
+    image_list.par_iter_mut().try_for_each(
+        |image| -> Result<(), Box<dyn Error + Send + Sync>> {
+            check_cancelled()?;
+
+            image.resize_dimensions(&image_settings.min_pixel_count);
+            image.file_type = image_settings.format.clone();
+            Ok(())
+        },
+    )?;
+
+    Ok(())
 }
 
 #[derive(Hash, Eq, PartialEq, Clone)]
@@ -122,6 +145,8 @@ fn process_images_from_image_list(
     image_settings: &ImageSettings,
     input_directory: &Path,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
+    check_cancelled()?;
+
     // Group images by resolution and file type to create initial batches
     let mut batches: HashMap<BatchKey, Vec<Image>> = HashMap::new();
 
@@ -145,6 +170,8 @@ fn process_images_from_image_list(
             images.len()
         );
     }
+
+    check_cancelled()?;
 
     // Calculate optimal number of threads
     let cpu_thread_count = num_cpus::get();
@@ -172,9 +199,14 @@ fn process_images_from_image_list(
         work_units.len()
     );
 
+    check_cancelled()?;
+
     // Process work units in parallel with ordered task distribution
     work_units.into_iter().par_bridge().try_for_each(
         |(batch_key, images)| -> Result<(), Box<dyn Error + Send + Sync>> {
+            // Check cancellation at the start of each work unit
+            check_cancelled()?;
+
             let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
                 logo_list
                     .iter()
@@ -311,6 +343,8 @@ fn process_logos_for_image_resolutions(
     image_settings: &ImageSettings,
     image_list: &Vec<Image>,
 ) -> Result<Option<Vec<Logo>>, Box<dyn Error + Send + Sync>> {
+    check_cancelled()?;
+
     let logo_list: Option<Vec<Logo>> = if image_settings.add_logo {
         // Make a hashset of all the unique resolutions of the Images
         let mut unique_resolutions = std::collections::HashSet::new();
@@ -360,7 +394,7 @@ fn read_images_in_input_directory(
         info!("Found {} valid image paths", valid_image_paths.len());
 
         let image_creation_start = std::time::Instant::now();
-        let images = create_images_from_paths_parallel(&valid_image_paths);
+        let images = create_images_from_paths_parallel(&valid_image_paths)?;
         info!("Image creation took: {:?}", image_creation_start.elapsed());
 
         image_list.extend(images);
@@ -423,28 +457,32 @@ fn read_images_recursive_parallel(
     let walk_start = std::time::Instant::now();
 
     // Use jwalk for parallel directory walking with inline filtering
-    let valid_image_paths: Vec<PathBuf> = jwalk::WalkDir::new(directory)
-        .skip_hidden(false)
-        .into_iter()
-        .filter_map(|entry| {
-            let entry = entry.ok()?;
-            let path = entry.path();
+    let valid_image_paths: Result<Vec<PathBuf>, Box<dyn Error + Send + Sync>> =
+        jwalk::WalkDir::new(directory)
+            .skip_hidden(false)
+            .into_iter()
+            .filter_map(|entry| {
+                // Check cancellation - if cancelled, convert to error that will propagate
+                if let Err(e) = check_cancelled() {
+                    return Some(Err(e));
+                }
 
-            if !path.is_file() {
-                return None;
-            }
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(_) => return None,
+                };
 
-            if !is_supported_image_extension(&path) {
-                return None;
-            }
+                let path = entry.path();
 
-            if !write_to_output_directory(&path, directory, output_directory, image_settings) {
-                return None;
-            }
+                if !is_valid_image_path(&path, directory, output_directory, image_settings) {
+                    return None;
+                }
 
-            Some(path)
-        })
-        .collect();
+                Some(Ok(path))
+            })
+            .collect();
+
+    let valid_image_paths = valid_image_paths?;
 
     info!(
         "Directory walk and filtering took: {:?}",
@@ -453,7 +491,7 @@ fn read_images_recursive_parallel(
     info!("Found {} valid image paths", valid_image_paths.len());
 
     let image_creation_start = std::time::Instant::now();
-    let images = create_images_from_paths_parallel(&valid_image_paths);
+    let images = create_images_from_paths_parallel(&valid_image_paths)?;
     info!("Image creation took: {:?}", image_creation_start.elapsed());
 
     image_list.extend(images);
@@ -474,28 +512,39 @@ fn filter_valid_image_paths(
     image_settings: &ImageSettings,
 ) -> Vec<PathBuf> {
     paths
-        .filter(|path| {
-            path.is_file()
-                && is_supported_image_extension(path)
-                && write_to_output_directory(
-                    path,
-                    input_directory,
-                    output_directory,
-                    image_settings,
-                )
-        })
+        .filter(|path| is_valid_image_path(path, input_directory, output_directory, image_settings))
         .collect()
 }
 
+fn is_valid_image_path(
+    path: &Path,
+    input_directory: &Path,
+    output_directory: &Path,
+    image_settings: &ImageSettings,
+) -> bool {
+    path.is_file()
+        && is_supported_image_extension(path)
+        && write_to_output_directory(path, input_directory, output_directory, image_settings)
+}
+
 /// Creates Image objects from paths in parallel, filtering out failed creations
-fn create_images_from_paths_parallel(paths: &[PathBuf]) -> Vec<Image> {
+fn create_images_from_paths_parallel(
+    paths: &[PathBuf],
+) -> Result<Vec<Image>, Box<dyn Error + Send + Sync>> {
     paths
         .par_iter()
-        .filter_map(|path| match Image::new(path.clone()) {
-            Ok(image) => Some(image),
-            Err(e) => {
-                error!("Failed to load image {}: {}", path.display(), e);
-                None
+        .filter_map(|path| {
+            // Check cancellation first
+            if let Err(e) = check_cancelled() {
+                return Some(Err(e));
+            }
+
+            match Image::new(path.clone()) {
+                Ok(image) => Some(Ok(image)),
+                Err(e) => {
+                    error!("Failed to load image {}: {}", path.display(), e);
+                    None
+                }
             }
         })
         .collect()

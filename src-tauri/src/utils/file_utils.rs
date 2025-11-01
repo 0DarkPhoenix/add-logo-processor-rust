@@ -6,7 +6,9 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub fn read_file_size(file_path: &PathBuf) -> Result<u64, Box<dyn Error>> {
+use crate::handlers::process_handler::check_cancelled;
+
+pub fn read_file_size(file_path: &PathBuf) -> Result<u64, Box<dyn Error + Send + Sync>> {
     let metadata = metadata(file_path)?;
     Ok(metadata.len())
 }
@@ -23,7 +25,7 @@ pub fn read_file_type(file_path: &Path) -> String {
 ///
 /// This function clears the contents of a folder without deleting the folder itself,
 /// which is significantly faster than deleting and recreating the directory.
-pub fn clear_and_create_folder(folder_path: &Path) -> Result<(), Box<dyn Error>> {
+pub fn clear_and_create_folder(folder_path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
     if folder_path.exists() {
         // Clear contents instead of deleting the directory
         clear_directory_contents(folder_path)?;
@@ -35,8 +37,10 @@ pub fn clear_and_create_folder(folder_path: &Path) -> Result<(), Box<dyn Error>>
 }
 
 /// Recursively clear all contents of a directory without deleting the directory itself
-fn clear_directory_contents(dir_path: &Path) -> Result<(), Box<dyn Error>> {
+fn clear_directory_contents(dir_path: &Path) -> Result<(), Box<dyn Error + Send + Sync>> {
     for entry in read_dir(dir_path)? {
+        check_cancelled()?;
+
         let entry = entry?;
         let path = entry.path();
 

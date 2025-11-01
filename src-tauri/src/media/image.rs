@@ -23,7 +23,7 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new(file_path: PathBuf) -> Result<Self, Box<dyn Error>> {
+    pub fn new(file_path: PathBuf) -> Result<Self, Box<dyn Error + Send + Sync>> {
         // Get file size
         let file_size = read_file_size(&file_path)?;
 
@@ -63,7 +63,7 @@ impl Media for Image {
 }
 
 /// Read the image file type and validate it's supported by FFmpeg
-fn read_image_file_type(file_path: &Path) -> Result<String, Box<dyn Error>> {
+fn read_image_file_type(file_path: &Path) -> Result<String, Box<dyn Error + Send + Sync>> {
     let file_type = read_file_type(file_path);
 
     if IMAGE_FORMAT_REGISTRY.is_supported_for_reading(file_type.as_str()) {
@@ -73,7 +73,7 @@ fn read_image_file_type(file_path: &Path) -> Result<String, Box<dyn Error>> {
     }
 }
 
-pub fn read_image_resolution(path: &Path) -> Result<Resolution, Box<dyn Error>> {
+pub fn read_image_resolution(path: &Path) -> Result<Resolution, Box<dyn Error + Send + Sync>> {
     // Check if the file is an SVG
     let extension = path
         .extension()
@@ -146,45 +146,45 @@ pub fn apply_image_format_specific_args(image_format: &str, cmd: &mut FfmpegComm
     }
 }
 
-/// Handle resizing an image to ICO format with FFmpeg
-fn handle_resize_to_ico_format(
-    input_path: &Path,
-    output_path: &Path,
-    resolution: &Resolution,
-) -> Result<(), Box<dyn Error>> {
-    // ICO format maximum size is 256x256, preserve aspect ratio
-    let max_dimension = resolution.width.max(resolution.height);
+// /// Handle resizing an image to ICO format with FFmpeg
+// fn handle_resize_to_ico_format(
+//     input_path: &Path,
+//     output_path: &Path,
+//     resolution: &Resolution,
+// ) -> Result<(), Box<dyn Error>> {
+//     // ICO format maximum size is 256x256, preserve aspect ratio
+//     let max_dimension = resolution.width.max(resolution.height);
 
-    let (width, height) = if max_dimension > 256 {
-        // Scale down proportionally to fit within 256x256
-        let scale_factor = 256.0 / max_dimension as f32;
-        let width = (resolution.width as f32 * scale_factor) as u32;
-        let height = (resolution.height as f32 * scale_factor) as u32;
-        (width, height)
-    } else {
-        (resolution.width, resolution.height)
-    };
+//     let (width, height) = if max_dimension > 256 {
+//         // Scale down proportionally to fit within 256x256
+//         let scale_factor = 256.0 / max_dimension as f32;
+//         let width = (resolution.width as f32 * scale_factor) as u32;
+//         let height = (resolution.height as f32 * scale_factor) as u32;
+//         (width, height)
+//     } else {
+//         (resolution.width, resolution.height)
+//     };
 
-    let ffmpeg_child = FfmpegCommand::new()
-        .args([
-            "-y", // Overwrite output file
-            "-i",
-            input_path.to_str().ok_or("Invalid input path")?,
-            "-vf",
-            &format!("scale={}:{}", width, height),
-            "-pix_fmt",
-            "bgra", // ICO format typically uses BGRA
-            "-f",
-            image_format::ICO.name,
-        ])
-        .output(output_path.to_str().ok_or("Invalid output path")?)
-        .spawn()?;
+//     let ffmpeg_child = FfmpegCommand::new()
+//         .args([
+//             "-y", // Overwrite output file
+//             "-i",
+//             input_path.to_str().ok_or("Invalid input path")?,
+//             "-vf",
+//             &format!("scale={}:{}", width, height),
+//             "-pix_fmt",
+//             "bgra", // ICO format typically uses BGRA
+//             "-f",
+//             image_format::ICO.name,
+//         ])
+//         .output(output_path.to_str().ok_or("Invalid output path")?)
+//         .spawn()?;
 
-    ffmpeg_logger(ffmpeg_child)
-}
+//     ffmpeg_logger(ffmpeg_child)
+// }
 
 /// Logger that processes FFmpeg events and waits for completion
-pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error>> {
+pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Get PID immediately but don't register yet
     let pid = ffmpeg_child.as_inner().id();
 
@@ -201,7 +201,9 @@ pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error>
 }
 
 /// Process FFmpeg output without any mutex operations
-fn process_ffmpeg_output(ffmpeg_child: &mut FfmpegChild) -> Result<(), Box<dyn Error>> {
+fn process_ffmpeg_output(
+    ffmpeg_child: &mut FfmpegChild,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     // Iterate over FFmpeg output events
     for event in ffmpeg_child.iter()? {
         match event {

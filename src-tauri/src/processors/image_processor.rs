@@ -1,3 +1,4 @@
+use crate::handlers::process_handler::check_cancelled;
 use crate::media::image::{apply_image_format_specific_args, ffmpeg_logger};
 use crate::media::{Image, Logo, Resolution};
 use ffmpeg_sidecar::command::FfmpegCommand;
@@ -9,7 +10,7 @@ use std::time::Instant;
 pub fn process_image_batch(
     batch_data: &[(Image, PathBuf)],
     logo: Option<&Logo>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
     if batch_data.is_empty() {
         return Ok(());
     }
@@ -56,7 +57,9 @@ fn process_image_chunk(
     logo: Option<&Logo>,
     target_resolution: &Resolution,
     target_file_type: &str,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    check_cancelled()?;
+
     // Create output directories
     for (_, output_directory) in batch_data {
         std::fs::create_dir_all(output_directory)?;

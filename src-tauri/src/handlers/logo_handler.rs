@@ -1,4 +1,5 @@
 use crate::{
+    handlers::process_handler::check_cancelled,
     media::{Corner, Logo, Resolution},
     processors::logo_processor::process_logo,
     utils::{
@@ -69,6 +70,8 @@ pub fn handle_logos<T: LogoSettings>(
 
     let mut logos = Vec::new();
     for resolution in &unique_resolutions {
+        check_cancelled()?;
+
         let logo = Logo::new(
             settings
                 .logo_path()
@@ -89,9 +92,8 @@ pub fn handle_logos<T: LogoSettings>(
     logos
         .par_iter_mut()
         .try_for_each(|logo| -> Result<(), Box<dyn Error + Send + Sync>> {
-            process_logo(logo, &output_dir_clone).map_err(|e| -> Box<dyn Error + Send + Sync> {
-                format!("Failed to process logo: {}", e).into()
-            })
+            process_logo(logo, &output_dir_clone)
+                .map_err(|e| format!("Failed to process logo: {}", e).into())
         })?;
     Ok(logos)
 }
