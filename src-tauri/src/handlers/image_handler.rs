@@ -22,11 +22,14 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
     let input_directory = &image_settings.input_directory;
     let output_directory = &image_settings.output_directory;
 
-    let mut image_list = Vec::new();
+    let mut image_list;
 
     let start_time = std::time::Instant::now();
 
-    ProgressManager::start_progress_with_terminal("Reading images... (Step 1/5)".to_string(), None);
+    ProgressManager::start_progress_with_terminal(
+        "Clearing and creating output folder... (Step 1/7)".to_string(),
+        None,
+    );
 
     check_cancelled()?;
 
@@ -39,18 +42,17 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         );
     }
 
+    ProgressManager::set_status(
+        "Reading image paths from input directory... (Step 2/7)".to_string(),
+    );
     check_cancelled()?;
 
-    let read_images_time = std::time::Instant::now();
-    read_images_in_input_directory(
-        image_settings,
-        input_directory,
-        &mut image_list,
-        output_directory,
-    )?;
-    info!("Reading images took: {:?}", read_images_time.elapsed());
+    let read_paths_time = std::time::Instant::now();
+    let valid_image_paths =
+        read_image_paths_from_input_directory(image_settings, input_directory, output_directory)?;
+    info!("Reading image paths took: {:?}", read_paths_time.elapsed());
 
-    if image_list.is_empty() {
+    if valid_image_paths.is_empty() {
         ProgressManager::set_status("No images found in the input directory".to_string());
         info!("No images found in the input directory, returning early.");
         info!("Total time: {:?}", start_time.elapsed());
@@ -59,7 +61,24 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 
     check_cancelled()?;
 
-    ProgressManager::set_status("Sorting images by file size... (Step 2/5)".to_string());
+    ProgressManager::set_status("Creating image structs... (Step 3/7)".to_string());
+    let image_creation_time = std::time::Instant::now();
+    image_list = create_images_from_paths_parallel(&valid_image_paths)?;
+    info!(
+        "Creating image structs took: {:?}",
+        image_creation_time.elapsed()
+    );
+
+    if image_list.is_empty() {
+        ProgressManager::set_status("No valid images could be loaded".to_string());
+        info!("No valid images could be loaded, returning early.");
+        info!("Total time: {:?}", start_time.elapsed());
+        return Ok(());
+    }
+
+    check_cancelled()?;
+
+    ProgressManager::set_status("Sorting images by file size... (Step 4/7)".to_string());
     let sort_start = std::time::Instant::now();
     sort_list_by_file_size(&mut image_list);
     info!(
@@ -69,7 +88,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 
     check_cancelled()?;
 
-    ProgressManager::set_status("Applying image settings... (Step 3/5)".to_string());
+    ProgressManager::set_status("Applying image settings... (Step 5/7)".to_string());
     let apply_settings_start = std::time::Instant::now();
     apply_image_settings_per_image(image_settings, &mut image_list)?;
     info!(
@@ -77,7 +96,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
         apply_settings_start.elapsed()
     );
 
-    ProgressManager::set_status("Processing logos... (Step 4/5)".to_string());
+    ProgressManager::set_status("Processing logos... (Step 6/7)".to_string());
     let logo_processing_start = std::time::Instant::now();
     let logo_list = process_logos_for_image_resolutions(image_settings, &image_list)?;
     info!(
@@ -87,7 +106,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 
     check_cancelled()?;
 
-    ProgressManager::set_status("Processing images... (Step 5/5)".to_string());
+    ProgressManager::set_status("Processing images... (Step 7/7)".to_string());
     ProgressManager::set_total(image_list.len());
     let image_processing_start = std::time::Instant::now();
     process_images_from_image_list(
@@ -257,7 +276,7 @@ fn process_images_from_image_list(
                 },
             )?;
 
-            ProgressManager::increment_progress(Some(batch_data.len()));
+            // ProgressManager::increment_progress(batch_data.len());
 
             Ok(())
         },
@@ -362,20 +381,14 @@ fn process_logos_for_image_resolutions(
     Ok(logo_list)
 }
 
-/// Reads all images in the input directory, and adds them to the image list
-fn read_images_in_input_directory(
+/// Reads all image paths from the input directory
+fn read_image_paths_from_input_directory(
     image_settings: &ImageSettings,
     input_directory: &Path,
-    image_list: &mut Vec<Image>,
     output_directory: &Path,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<Vec<PathBuf>, Box<dyn Error + Send + Sync>> {
     if image_settings.search_child_folders {
-        read_images_recursive_parallel(
-            input_directory,
-            image_list,
-            output_directory,
-            image_settings,
-        )?;
+        read_image_paths_recursive_parallel(input_directory, output_directory, image_settings)
     } else {
         let dir_read_start = std::time::Instant::now();
         let entries: Result<Vec<_>, _> = read_dir(input_directory)?.collect();
@@ -393,13 +406,8 @@ fn read_images_in_input_directory(
         info!("Path filtering took: {:?}", filter_start.elapsed());
         info!("Found {} valid image paths", valid_image_paths.len());
 
-        let image_creation_start = std::time::Instant::now();
-        let images = create_images_from_paths_parallel(&valid_image_paths)?;
-        info!("Image creation took: {:?}", image_creation_start.elapsed());
-
-        image_list.extend(images);
+        Ok(valid_image_paths)
     }
-    Ok(())
 }
 
 /// Determine if the image should be written to the output directory.
@@ -447,13 +455,12 @@ fn is_supported_image_extension(path: &Path) -> bool {
     }
 }
 
-/// Recursively read all images from child directories in parallel using jwalk
-fn read_images_recursive_parallel(
+/// Recursively read all image paths from child directories in parallel using jwalk
+fn read_image_paths_recursive_parallel(
     directory: &Path,
-    image_list: &mut Vec<Image>,
     output_directory: &Path,
     image_settings: &ImageSettings,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<Vec<PathBuf>, Box<dyn Error + Send + Sync>> {
     let walk_start = std::time::Instant::now();
 
     // Use jwalk for parallel directory walking with inline filtering
@@ -490,13 +497,7 @@ fn read_images_recursive_parallel(
     );
     info!("Found {} valid image paths", valid_image_paths.len());
 
-    let image_creation_start = std::time::Instant::now();
-    let images = create_images_from_paths_parallel(&valid_image_paths)?;
-    info!("Image creation took: {:?}", image_creation_start.elapsed());
-
-    image_list.extend(images);
-
-    Ok(())
+    Ok(valid_image_paths)
 }
 
 /// Sorts the image list by file size in descending order (largest to smallest)

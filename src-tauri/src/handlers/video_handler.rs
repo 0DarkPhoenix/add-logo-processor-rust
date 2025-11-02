@@ -149,7 +149,7 @@ fn process_videos_from_video_list(
                 },
             )?;
 
-            ProgressManager::increment_progress(Some(1));
+            ProgressManager::increment_progress(1);
 
             Ok(())
         },

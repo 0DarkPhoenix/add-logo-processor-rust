@@ -185,10 +185,8 @@ pub fn apply_image_format_specific_args(image_format: &str, cmd: &mut FfmpegComm
 
 /// Logger that processes FFmpeg events and waits for completion
 pub fn ffmpeg_logger(mut ffmpeg_child: FfmpegChild) -> Result<(), Box<dyn Error + Send + Sync>> {
-    // Get PID immediately but don't register yet
+    // Register the ffmpeg process to the process manager
     let pid = ffmpeg_child.as_inner().id();
-
-    // Register process without blocking - just store the PID
     let process_id = ProcessManager::register_process_by_pid(pid);
 
     // Process FFmpeg output without holding any locks
@@ -224,7 +222,7 @@ fn process_ffmpeg_output(
             ffmpeg_sidecar::event::FfmpegEvent::Progress(progress) => {
                 // Optionally log progress at intervals
                 // Consider removing this entirely for maximum performance
-                // dbg!("FFmpeg: {}", progress);
+                // dbg!(progress);
             }
             ffmpeg_sidecar::event::FfmpegEvent::Done => {
                 break;
