@@ -1,0 +1,13 @@
+pub mod commands;
+pub mod config;
+pub mod ffmpeg_logger;
+pub mod ffmpeg_processor;
+pub mod ffmpeg_structs;
+pub mod file_utils;
+pub mod logo_handler;
+pub mod logo_processor;
+pub mod logo_structs;
+pub mod media_structs;
+pub mod process_manager;
+pub mod progress_handler;
+pub mod progress_terminal_bar;

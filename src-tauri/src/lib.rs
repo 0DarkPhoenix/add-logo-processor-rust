@@ -2,17 +2,16 @@ use ffmpeg_sidecar::download::auto_download;
 use tauri::{AppHandle, Manager, RunEvent};
 use tauri_plugin_log::{Target, TargetKind};
 // Re-export types for ts-rs
-pub use handlers::progress_handler::ProgressInfo;
-pub use media::Corner;
-pub use utils::config::{AppConfig, ImageSettings, VideoSettings};
+pub use shared::commands;
+pub use shared::config::{AppConfig, ImageSettings, VideoSettings};
+pub use shared::media_structs::Corner;
+pub use shared::progress_handler::ProgressInfo;
 
-mod codecs;
-mod commands;
-mod formats;
-mod handlers;
-mod media;
-mod processors;
-mod utils;
+use crate::shared::process_manager::ProcessManager;
+
+mod image;
+mod shared;
+mod video;
 
 // Create a wrapper for the AppHandle
 pub struct AppState {
@@ -64,7 +63,7 @@ pub fn run() {
             // Handle app exit events
             if let RunEvent::Exit = event {
                 log::info!("Application is exiting, cleaning up FFmpeg processes...");
-                if let Err(e) = handlers::process_handler::ProcessManager::kill_all_processes() {
+                if let Err(e) = ProcessManager::kill_all_processes() {
                     log::error!("Failed to kill FFmpeg processes on exit: {}", e);
                 }
             }
