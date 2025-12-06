@@ -149,7 +149,7 @@ pub mod image_format {
     pub const SVG: ImageFormat = ImageFormat::new(
         "svg",
         &["svg"],
-        FormatSupport::read_only(),
+        FormatSupport::unsupported(),
         "Scalable Vector Graphics",
     );
 

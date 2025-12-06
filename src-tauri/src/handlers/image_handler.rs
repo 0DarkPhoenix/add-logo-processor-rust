@@ -1,3 +1,4 @@
+use ffmpeg_sidecar::command::FfmpegCommand;
 use log::{error, info};
 use rayon::prelude::*;
 use std::collections::HashMap;
@@ -7,11 +8,12 @@ use std::{error::Error, fs::read_dir, path::Path};
 use crate::formats::image_format_types::IMAGE_FORMAT_REGISTRY;
 use crate::handlers::process_handler::{check_cancelled, ProcessManager};
 use crate::handlers::progress_handler::ProgressManager;
+use crate::media::image::apply_image_format_specific_args;
+use crate::processors::{spawn_ffmpeg_process, FfmpegBatchCommand};
 use crate::utils::{clear_and_create_folder, get_relative_path};
 use crate::{
     handlers::handle_logos,
     media::{Image, Logo, Media, Resolution},
-    processors::process_image_batch,
     utils::config::ImageSettings,
 };
 
@@ -179,105 +181,71 @@ fn process_images_from_image_list(
 
     info!("Created {} initial batches for processing", batches.len());
 
-    // Print batch sizes for debugging
-    for (key, images) in &batches {
+    check_cancelled()?;
+
+    let mut ffmpeg_command_list: Vec<FfmpegBatchCommand> = Vec::new();
+
+    for (batch_key, images) in batches {
+        // Check cancellation at the start of each work unit
+        check_cancelled()?;
+
+        let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
+            logo_list
+                .iter()
+                .find(|logo| logo.compatible_image_resolution == batch_key.resolution)
+        } else {
+            None
+        };
+
+        if logo.is_none() && logo_list.is_some() {
+            return Err(format!(
+                "No logo found for the given image resolution: {}",
+                batch_key.resolution
+            )
+            .into());
+        }
+
+        // Prepare batch data with output directories
+        let batch_data: Vec<(Image, PathBuf)> = images
+            .iter()
+            .map(|image| {
+                let final_output_directory = if image_settings
+                    .keep_child_folders_structure_in_output_directory
+                {
+                    let relative_image_path = get_relative_path(input_directory, &image.file_path)
+                        .unwrap_or_else(|_| PathBuf::from(""));
+                    let relative_dir_path = relative_image_path.parent().unwrap_or(Path::new(""));
+                    output_directory.join(relative_dir_path)
+                } else {
+                    output_directory.to_path_buf()
+                };
+                (image.clone(), final_output_directory)
+            })
+            .collect();
+
         info!(
-            "Batch {}x{} ({}): {} images",
-            key.resolution.width,
-            key.resolution.height,
-            key.file_type,
-            images.len()
+            "Processing work unit with {} images ({}x{}, {})",
+            batch_data.len(),
+            batch_key.resolution.width,
+            batch_key.resolution.height,
+            batch_key.file_type
         );
+        ProgressManager::redraw_progress();
+
+        create_image_ffmpeg_command_list(&batch_data, logo, &mut ffmpeg_command_list).map_err(
+            |e| -> Box<dyn Error + Send + Sync> {
+                format!("Failed to process image batch: {}", e).into()
+            },
+        )?;
     }
 
-    check_cancelled()?;
+    // Sort the commands by batch size
+    ffmpeg_command_list.sort_by(|a, b| b.batch_size.cmp(&a.batch_size));
 
-    // Calculate optimal number of threads
-    let cpu_thread_count = num_cpus::get();
-    let total_images = batches.values().map(|v| v.len()).sum::<usize>();
-
-    // Using more batches for better thread utilization
-    // After much testing, the optimal number of batches is 2 times the number of CPU threads
-    // * 1.5 = +5.08%
-    // * 1.75 = +0.86%
-    // * 2 = 0% - benchmark
-    // * 2.25 = +7.84%
-    // * 2.5 = +3.30%
-    let optimal_batches = cpu_thread_count * 2;
-
-    info!(
-        "Using {} batches for {} total images",
-        optimal_batches, total_images
-    );
-
-    // Split large batches to better utilize threads
-    let work_units = split_batches_optimally(batches, optimal_batches);
-
-    info!(
-        "Split into {} work units for optimal thread utilization",
-        work_units.len()
-    );
-
-    check_cancelled()?;
-
-    // Process work units in parallel with ordered task distribution
-    work_units.into_iter().par_bridge().try_for_each(
-        |(batch_key, images)| -> Result<(), Box<dyn Error + Send + Sync>> {
-            // Check cancellation at the start of each work unit
-            check_cancelled()?;
-
-            let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
-                logo_list
-                    .iter()
-                    .find(|logo| logo.compatible_image_resolution == batch_key.resolution)
-            } else {
-                None
-            };
-
-            if logo.is_none() && logo_list.is_some() {
-                return Err(format!(
-                    "No logo found for the given image resolution: {}",
-                    batch_key.resolution
-                )
-                .into());
-            }
-
-            // Prepare batch data with output directories
-            let batch_data: Vec<(Image, PathBuf)> = images
-                .iter()
-                .map(|image| {
-                    let final_output_directory =
-                        if image_settings.keep_child_folders_structure_in_output_directory {
-                            let relative_image_path =
-                                get_relative_path(input_directory, &image.file_path)
-                                    .unwrap_or_else(|_| PathBuf::from(""));
-                            let relative_dir_path =
-                                relative_image_path.parent().unwrap_or(Path::new(""));
-                            output_directory.join(relative_dir_path)
-                        } else {
-                            output_directory.to_path_buf()
-                        };
-                    (image.clone(), final_output_directory)
-                })
-                .collect();
-
-            info!(
-                "Processing work unit with {} images ({}x{}, {})",
-                batch_data.len(),
-                batch_key.resolution.width,
-                batch_key.resolution.height,
-                batch_key.file_type
-            );
-            ProgressManager::redraw_progress();
-
-            process_image_batch(&batch_data, logo).map_err(
-                |e| -> Box<dyn Error + Send + Sync> {
-                    format!("Failed to process image batch: {}", e).into()
-                },
-            )?;
-
-            // ProgressManager::increment_progress(batch_data.len());
-
+    // Execute FFmpeg commands in parallel
+    ffmpeg_command_list.into_iter().par_bridge().try_for_each(
+        |mut ffmpeg_batch_command| -> Result<(), Box<dyn Error + Send + Sync>> {
+            spawn_ffmpeg_process(&mut ffmpeg_batch_command)?;
             Ok(())
         },
     )?;
@@ -549,4 +517,137 @@ fn create_images_from_paths_parallel(
             }
         })
         .collect()
+}
+
+pub fn create_image_ffmpeg_command_list(
+    batch_data: &[(Image, PathBuf)],
+    logo: Option<&Logo>,
+    ffmpeg_command_list: &mut Vec<FfmpegBatchCommand>,
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    if batch_data.is_empty() {
+        return Ok(());
+    }
+
+    let first_image = &batch_data[0].0;
+    let target_resolution = &first_image.resolution;
+    let target_file_type = &first_image.file_type;
+
+    info!(
+        "Processing batch of {} images with resolution {}x{} and format {}",
+        batch_data.len(),
+        target_resolution.width,
+        target_resolution.height,
+        target_file_type,
+    );
+
+    // Process in chunks for better load balancing and more frequent progress bar progression
+    const CHUNK_SIZE: usize = 20;
+
+    if batch_data.len() <= CHUNK_SIZE {
+        let batch_command =
+            create_image_ffmpeg_command(batch_data, logo, target_resolution, target_file_type)?;
+        info!(
+            "Created command for batch of {} images",
+            batch_command.batch_size
+        );
+        ffmpeg_command_list.push(batch_command);
+    } else {
+        let num_chunks = batch_data.len().div_ceil(CHUNK_SIZE);
+        let optimal_chunk_size = batch_data.len().div_ceil(num_chunks);
+
+        for chunk in batch_data.chunks(optimal_chunk_size) {
+            let batch_command =
+                create_image_ffmpeg_command(chunk, logo, target_resolution, target_file_type)?;
+            info!(
+                "Created command for batch of {} images",
+                batch_command.batch_size
+            );
+            ffmpeg_command_list.push(batch_command);
+        }
+    }
+
+    Ok(())
+}
+
+fn create_image_ffmpeg_command(
+    batch_data: &[(Image, PathBuf)],
+    logo: Option<&Logo>,
+    target_resolution: &Resolution,
+    target_file_type: &str,
+) -> Result<FfmpegBatchCommand, Box<dyn Error + Send + Sync>> {
+    check_cancelled()?;
+
+    // Create output directories
+    for (_, output_directory) in batch_data {
+        std::fs::create_dir_all(output_directory)?;
+    }
+
+    // Build FFmpeg command for this chunk
+    let mut cmd = FfmpegCommand::new();
+
+    #[cfg(target_os = "windows")]
+    cmd.hide_banner();
+
+    cmd.args(["-y", "-an", "-vsync", "0"]);
+
+    // Add all input images in this chunk
+    for (image, _) in batch_data.iter() {
+        cmd.input(image.file_path.to_str().ok_or("Invalid image file path")?);
+    }
+
+    // Add logo input if present
+    if let Some(logo_ref) = logo {
+        cmd.input(
+            logo_ref
+                .file_path
+                .to_str()
+                .ok_or("Invalid logo file path")?,
+        );
+    }
+
+    // Build complex filter for this chunk
+    let mut filter_parts = Vec::new();
+
+    for (i, _) in batch_data.iter().enumerate() {
+        if let Some(logo_ref) = logo {
+            // Scale and overlay logo for each image
+            let logo_idx = batch_data.len(); // Logo is the last input
+            filter_parts.push(format!(
+                "[{}:v]scale={}:{}:flags=fast_bilinear[scaled{}];[scaled{}][{}:v]overlay={}:{}[out{}]",
+                i, target_resolution.width, target_resolution.height, i,
+                i, logo_idx, logo_ref.position.x, logo_ref.position.y, i
+            ));
+        } else {
+            // Just scale each image
+            filter_parts.push(format!(
+                "[{}:v]scale={}:{}:flags=fast_bilinear[out{}]",
+                i, target_resolution.width, target_resolution.height, i
+            ));
+        }
+    }
+
+    let filter_complex = filter_parts.join(";");
+    cmd.args(["-filter_complex", &filter_complex]);
+
+    // Add output mappings and files
+    for (i, (image, output_directory)) in batch_data.iter().enumerate() {
+        let file_stem = image
+            .file_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .ok_or("Invalid file name")?;
+
+        let new_filename = format!("{}.{}", file_stem, target_file_type);
+        let output_file = output_directory.join(new_filename);
+
+        cmd.args(["-map", &format!("[out{}]", i)]);
+        apply_image_format_specific_args(target_file_type, &mut cmd);
+        cmd.output(output_file.to_str().ok_or("Invalid output file path")?);
+    }
+
+    // Return the command wrapped in ImageBatchCommand struct
+    Ok(FfmpegBatchCommand {
+        command: cmd,
+        batch_size: batch_data.len(),
+    })
 }

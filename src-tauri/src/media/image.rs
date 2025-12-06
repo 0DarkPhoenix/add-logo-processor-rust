@@ -222,7 +222,7 @@ fn process_ffmpeg_output(
             ffmpeg_sidecar::event::FfmpegEvent::Progress(progress) => {
                 // Optionally log progress at intervals
                 // Consider removing this entirely for maximum performance
-                // dbg!(progress);
+                dbg!(progress);
             }
             ffmpeg_sidecar::event::FfmpegEvent::Done => {
                 break;
