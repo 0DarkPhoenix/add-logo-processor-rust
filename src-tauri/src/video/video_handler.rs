@@ -1,79 +1,120 @@
+use ffmpeg_sidecar::command::FfmpegCommand;
+use log::info;
 use rayon::prelude::*;
 use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
-use walkdir::WalkDir;
 
+use crate::shared::ffmpeg_processor::spawn_ffmpeg_process;
+use crate::shared::ffmpeg_structs::FfmpegBatchCommand;
 use crate::shared::file_utils::{clear_and_create_folder, get_relative_path};
 use crate::shared::logo_handler::handle_logos;
 use crate::shared::logo_structs::Logo;
 use crate::shared::media_structs::{Media, Resolution};
+use crate::shared::media_validator::{
+    create_media_from_paths_parallel, filter_valid_media_paths, read_media_paths_recursive,
+    sort_by_file_size,
+};
+use crate::shared::process_manager::{check_process_cancelled, ProcessManager};
 use crate::shared::progress_handler::ProgressManager;
-use crate::video::video::Video;
-use crate::video::video_processor::process_video;
+use crate::video::video_structs::Video;
+use crate::video::video_validator::VideoSettingsValidator;
 use crate::VideoSettings;
 
 pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error + Send + Sync>> {
+    // Clear any previous processes at the start
+    ProcessManager::clear();
+
     let input_directory = &video_settings.input_directory;
     let output_directory = &video_settings.output_directory;
 
-    let mut video_list = Vec::new();
+    let mut video_list;
 
     let start_time = std::time::Instant::now();
 
-    ProgressManager::start_progress_with_terminal("Reading videos... (Step 1/5)".to_string(), None);
+    ProgressManager::start_progress_with_terminal(
+        "Clearing and creating output folder... (Step 1/6)".to_string(),
+        None,
+    );
+
+    check_process_cancelled()?;
 
     if video_settings.clear_files_output_directory || !output_directory.exists() {
         let clear_folder_time = std::time::Instant::now();
         clear_and_create_folder(output_directory).unwrap();
-        println!(
+        info!(
             "Clearing and creating output directory took: {:?}",
             clear_folder_time.elapsed()
         );
     }
 
-    let read_videos_time = std::time::Instant::now();
-    read_videos_in_input_directory(
-        video_settings,
-        input_directory,
-        &mut video_list,
-        output_directory,
-    )?;
-    println!("Reading videos took: {:?}", read_videos_time.elapsed());
+    ProgressManager::set_status(
+        "Reading video paths from input directory... (Step 2/6)".to_string(),
+    );
+    check_process_cancelled()?;
 
-    if video_list.is_empty() {
+    let read_paths_time = std::time::Instant::now();
+    let valid_video_paths =
+        read_video_paths_from_input_directory(video_settings, input_directory, output_directory)?;
+    info!("Reading video paths took: {:?}", read_paths_time.elapsed());
+
+    if valid_video_paths.is_empty() {
         ProgressManager::set_status("No videos found in the input directory".to_string());
-        println!("No videos found in the input directory, returning early.");
-        println!("Total time: {:?}", start_time.elapsed());
+        info!("No videos found in the input directory, returning early.");
+        info!("Total time: {:?}", start_time.elapsed());
         return Ok(());
     }
 
-    ProgressManager::set_status("Sorting videos by file size... (Step 2/5)".to_string());
+    check_process_cancelled()?;
+
+    ProgressManager::set_status("Creating video structs... (Step 3/6)".to_string());
+    let video_creation_time = std::time::Instant::now();
+    video_list = create_media_from_paths_parallel(&valid_video_paths, Video::new)?;
+    info!(
+        "Creating video structs took: {:?}",
+        video_creation_time.elapsed()
+    );
+
+    if video_list.is_empty() {
+        ProgressManager::set_status("No valid videos could be loaded".to_string());
+        info!("No valid videos could be loaded, returning early.");
+        info!("Total time: {:?}", start_time.elapsed());
+        return Ok(());
+    }
+
+    check_process_cancelled()?;
+
+    ProgressManager::set_status("Sorting videos by file size... (Step 4/6)".to_string());
     let sort_start = std::time::Instant::now();
-    sort_list_by_file_size(&mut video_list);
-    println!(
+    sort_by_file_size(&mut video_list);
+    info!(
         "Sorting videos by file size took: {:?}",
         sort_start.elapsed()
     );
 
-    ProgressManager::set_status("Applying video settings... (Step 3/5)".to_string());
+    check_process_cancelled()?;
+
+    ProgressManager::set_status("Applying video settings... (Step 5/6)".to_string());
     let apply_settings_start = std::time::Instant::now();
-    apply_video_settings_per_video(video_settings, &mut video_list);
-    println!(
+    apply_video_settings_per_video(video_settings, &mut video_list)?;
+    info!(
         "Applying video settings took: {:?}",
         apply_settings_start.elapsed()
     );
 
-    ProgressManager::set_status("Processing logos... (Step 4/5)".to_string());
+    ProgressManager::set_status("Processing logos... (Step 6/6)".to_string());
     let logo_processing_start = std::time::Instant::now();
     let logo_list = process_logos_for_video_resolutions(video_settings, &video_list)?;
-    println!(
+    info!(
         "Processing logos took: {:?}",
         logo_processing_start.elapsed()
     );
 
-    ProgressManager::set_status("Processing videos... (Step 5/5)".to_string());
+    check_process_cancelled()?;
+
+    ProgressManager::set_status("Processing videos... (Step 7/7)".to_string());
     ProgressManager::set_total(video_list.len());
     let video_processing_start = std::time::Instant::now();
+
     process_videos_from_video_list(
         output_directory,
         video_list,
@@ -84,26 +125,37 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
 
     ProgressManager::finish_progress();
 
-    println!(
+    info!(
         "Processing videos took: {:?}",
         video_processing_start.elapsed()
     );
 
-    println!("Total time: {:?}", start_time.elapsed());
+    info!("Total time: {:?}", start_time.elapsed());
 
     Ok(())
 }
 
 /// Apply the video settings per video in parallel
-fn apply_video_settings_per_video(video_settings: &VideoSettings, video_list: &mut [Video]) {
-    video_list.iter_mut().par_bridge().for_each(|video| {
-        video.resize_dimensions(&video_settings.min_pixel_count);
-        video.file_type = video_settings.format.clone();
-        video.codec = video_settings.codec.clone();
-    });
+fn apply_video_settings_per_video(
+    video_settings: &VideoSettings,
+    video_list: &mut [Video],
+) -> Result<(), Box<dyn Error + Send + Sync>> {
+    check_process_cancelled()?;
+
+    video_list.par_iter_mut().try_for_each(
+        |video| -> Result<(), Box<dyn Error + Send + Sync>> {
+            check_process_cancelled()?;
+
+            video.resize_dimensions(&video_settings.min_pixel_count);
+            video.file_type = video_settings.format.clone();
+            video.codec = video_settings.codec.clone();
+            Ok(())
+        },
+    )?;
+
+    Ok(())
 }
 
-/// Process the videos from the video list in parallel
 fn process_videos_from_video_list(
     output_directory: &Path,
     video_list: Vec<Video>,
@@ -111,50 +163,100 @@ fn process_videos_from_video_list(
     video_settings: &VideoSettings,
     input_directory: &Path,
 ) -> Result<(), Box<dyn Error + Send + Sync>> {
-    video_list.into_iter().par_bridge().try_for_each(
-        |video| -> Result<(), Box<dyn Error + Send + Sync>> {
-            let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
-                logo_list
-                    .iter()
-                    .find(|logo| logo.compatible_image_resolution == video.resolution)
+    check_process_cancelled()?;
+
+    let mut ffmpeg_command_list: Vec<FfmpegBatchCommand> = Vec::new();
+
+    for video in video_list {
+        check_process_cancelled()?;
+
+        let logo: Option<&Logo> = if let Some(ref logo_list) = logo_list {
+            logo_list
+                .iter()
+                .find(|logo| logo.compatible_image_resolution == video.resolution)
+        } else {
+            None
+        };
+
+        let final_output_directory =
+            if video_settings.keep_child_folders_structure_in_output_directory {
+                let relative_video_path = get_relative_path(input_directory, &video.file_path)
+                    .unwrap_or_else(|_| PathBuf::from(""));
+                let relative_dir_path = relative_video_path.parent().unwrap_or(Path::new(""));
+                output_directory.join(relative_dir_path)
             } else {
-                None
+                output_directory.to_path_buf()
             };
 
-            if logo.is_none() && logo_list.is_some() {
-                return Err(format!(
-                    "No logo found for the given video resolution: {}",
-                    video.resolution
-                )
-                .into());
-            }
+        let batch_command = create_video_ffmpeg_command(&video, logo, &final_output_directory)?;
+        ffmpeg_command_list.push(batch_command);
+    }
 
-            let final_output_directory =
-                if video_settings.keep_child_folders_structure_in_output_directory {
-                    let relative_video_path = get_relative_path(input_directory, &video.file_path)
-                        .map_err(|e| -> Box<dyn Error + Send + Sync> {
-                            format!("Failed to get relative path: {}", e).into()
-                        })?;
-                    let relative_dir_path = relative_video_path.parent().unwrap_or(Path::new(""));
-                    output_directory.join(relative_dir_path)
-                } else {
-                    output_directory.to_path_buf()
-                };
-
-            ProgressManager::redraw_progress();
-
-            process_video(&video, logo, &final_output_directory).map_err(
-                |e| -> Box<dyn Error + Send + Sync> {
-                    format!("Failed to process video: {}", e).into()
-                },
-            )?;
-
-            ProgressManager::increment_progress(1);
-
+    // Execute FFmpeg commands in parallel
+    ffmpeg_command_list.into_iter().par_bridge().try_for_each(
+        |mut ffmpeg_batch_command| -> Result<(), Box<dyn Error + Send + Sync>> {
+            spawn_ffmpeg_process(&mut ffmpeg_batch_command)?;
             Ok(())
         },
     )?;
+
     Ok(())
+}
+
+fn create_video_ffmpeg_command(
+    video: &Video,
+    logo: Option<&Logo>,
+    output_directory: &Path,
+) -> Result<FfmpegBatchCommand, Box<dyn Error + Send + Sync>> {
+    check_process_cancelled()?;
+
+    // Create output directory
+    std::fs::create_dir_all(output_directory)?;
+
+    let mut cmd = FfmpegCommand::new();
+
+    #[cfg(target_os = "windows")]
+    cmd.hide_banner();
+
+    cmd.input(video.file_path.to_str().ok_or("Invalid video file path")?);
+
+    if let Some(logo) = logo {
+        cmd.input(logo.file_path.to_str().ok_or("Invalid logo file path")?);
+    }
+
+    if let Some(logo) = logo {
+        let filter_complex = format!(
+            "[0:v]scale={}:{}[resized];[resized][1:v]overlay={}:{}[final]",
+            video.resolution.width, video.resolution.height, logo.position.x, logo.position.y
+        );
+        cmd.args(["-filter_complex", &filter_complex]);
+        cmd.args(["-map", "[final]"]);
+    } else {
+        let filter_complex = format!(
+            "[0:v]scale={}:{}[final]",
+            video.resolution.width, video.resolution.height
+        );
+        cmd.args(["-filter_complex", &filter_complex]);
+        cmd.args(["-map", "[final]"]);
+    }
+
+    cmd.args(["-map", "0:a?"]);
+
+    let file_stem = video
+        .file_path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .ok_or("Invalid file name")?;
+
+    let new_filename = format!("{}.{}", file_stem, video.file_type);
+    let output_file = output_directory.join(new_filename);
+
+    cmd.output(output_file.to_str().ok_or("Invalid output file path")?);
+
+    Ok(FfmpegBatchCommand {
+        command: cmd,
+        batch_size: 1,
+    })
 }
 
 fn process_logos_for_video_resolutions(
@@ -178,162 +280,29 @@ fn process_logos_for_video_resolutions(
     Ok(logo_list)
 }
 
-/// Reads all videos in the input directory, and adds them to the video list
-fn read_videos_in_input_directory(
+/// Reads all video paths from the input directory
+fn read_video_paths_from_input_directory(
     video_settings: &VideoSettings,
     input_directory: &Path,
-    video_list: &mut Vec<Video>,
     output_directory: &Path,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
+) -> Result<Vec<PathBuf>, Box<dyn Error + Send + Sync>> {
+    let validator = VideoSettingsValidator::new(video_settings);
+
     if video_settings.search_child_folders {
-        read_videos_recursive_parallel(
-            input_directory,
-            video_list,
-            output_directory,
-            video_settings,
-        )?;
+        read_media_paths_recursive(input_directory, output_directory, &validator)
     } else {
         let dir_read_start = std::time::Instant::now();
         let entries: Result<Vec<_>, _> = read_dir(input_directory)?.collect();
         let entries = entries?;
-        println!("Directory read took: {:?}", dir_read_start.elapsed());
+        info!("Directory read took: {:?}", dir_read_start.elapsed());
 
         let filter_start = std::time::Instant::now();
         let entry_paths = entries.iter().map(|entry| entry.path());
-        let valid_video_paths = filter_valid_video_paths(
-            entry_paths,
-            input_directory,
-            output_directory,
-            video_settings,
-        );
-        println!("Path filtering took: {:?}", filter_start.elapsed());
-        println!("Found {} valid video paths", valid_video_paths.len());
+        let valid_video_paths =
+            filter_valid_media_paths(entry_paths, input_directory, output_directory, &validator);
+        info!("Path filtering took: {:?}", filter_start.elapsed());
+        info!("Found {} valid video paths", valid_video_paths.len());
 
-        let video_creation_start = std::time::Instant::now();
-        let videos = create_videos_from_paths_parallel(&valid_video_paths);
-        println!("Video creation took: {:?}", video_creation_start.elapsed());
-
-        video_list.extend(videos);
+        Ok(valid_video_paths)
     }
-    Ok(())
-}
-
-/// Determine if the video should be written to the output directory.
-///
-/// This is determined based on if the video already exists in the output directory and if it is allowed to be overwritten
-fn write_to_output_directory(
-    path: &Path,
-    input_directory: &Path,
-    output_directory: &Path,
-    video_settings: &VideoSettings,
-) -> bool {
-    if video_settings.overwrite_existing_files_output_directory {
-        return true;
-    }
-
-    // Get the file stem (filename without extension)
-    let file_stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("unknown");
-
-    // Get the target extension based on the format setting
-    let target_extension = &video_settings.format;
-
-    let target_filename = format!("{}.{}", file_stem, target_extension);
-
-    if video_settings.keep_child_folders_structure_in_output_directory {
-        let relative_video_path = get_relative_path(input_directory, path).unwrap();
-        let relative_dir_path = relative_video_path.parent().unwrap_or(Path::new(""));
-        let target_output_path = output_directory
-            .join(relative_dir_path)
-            .join(target_filename);
-        return !target_output_path.exists();
-    }
-
-    let target_output_path = output_directory.join(target_filename);
-    !target_output_path.exists()
-}
-
-fn is_supported_video_extension(path: &Path) -> bool {
-    if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
-        matches!(
-            extension.to_lowercase().as_str(),
-            "mp4" | "avi" | "mov" | "mkv" | "wmv" | "flv" | "webm" | "m4v" | "3gp" | "ogv"
-        )
-    } else {
-        false
-    }
-}
-
-/// Recursively read all videos from child directories in parallel
-fn read_videos_recursive_parallel(
-    directory: &Path,
-    video_list: &mut Vec<Video>,
-    output_directory: &Path,
-    video_settings: &VideoSettings,
-) -> Result<(), Box<dyn Error + Send + Sync>> {
-    let walkdir_paths = WalkDir::new(directory).into_iter().filter_map(|entry| {
-        let entry = entry.ok()?;
-        let path = entry.path();
-        if path.is_file() {
-            Some(path.to_path_buf())
-        } else {
-            None
-        }
-    });
-
-    let valid_video_paths = filter_valid_video_paths(
-        walkdir_paths,
-        directory, // Use directory as input_directory for recursive case
-        output_directory,
-        video_settings,
-    );
-
-    println!("Found {} video files to process", valid_video_paths.len());
-
-    let videos = create_videos_from_paths_parallel(&valid_video_paths);
-    video_list.extend(videos);
-
-    Ok(())
-}
-
-/// Sorts the video list by file size in descending order (largest to smallest)
-fn sort_list_by_file_size(video_list: &mut [Video]) {
-    video_list.sort_by(|a, b| b.file_size.cmp(&a.file_size));
-}
-
-/// Filters paths to only include valid video files that should be processed
-fn filter_valid_video_paths(
-    paths: impl Iterator<Item = PathBuf>,
-    input_directory: &Path,
-    output_directory: &Path,
-    video_settings: &VideoSettings,
-) -> Vec<PathBuf> {
-    paths
-        .filter(|path| {
-            path.is_file()
-                && is_supported_video_extension(path)
-                && write_to_output_directory(
-                    path,
-                    input_directory,
-                    output_directory,
-                    video_settings,
-                )
-        })
-        .collect()
-}
-
-/// Creates Video objects from paths in parallel, filtering out failed creations
-fn create_videos_from_paths_parallel(paths: &[PathBuf]) -> Vec<Video> {
-    paths
-        .par_iter()
-        .filter_map(|path| match Video::new(path.clone()) {
-            Ok(video) => Some(video),
-            Err(e) => {
-                eprintln!("Failed to load video {}: {}", path.display(), e);
-                None
-            }
-        })
-        .collect()
 }

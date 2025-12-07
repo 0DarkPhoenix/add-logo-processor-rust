@@ -1,18 +1,21 @@
 use ffmpeg_sidecar::command::FfmpegCommand;
-use log::{error, info};
+use log::info;
 use rayon::prelude::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::{error::Error, fs::read_dir, path::Path};
 
-use crate::image::image_formats::IMAGE_FORMAT_REGISTRY;
 use crate::image::image_struct::{apply_image_format_specific_args, Image};
+use crate::image::image_validator::ImageSettingsValidator;
 use crate::shared::ffmpeg_processor::spawn_ffmpeg_process;
 use crate::shared::ffmpeg_structs::FfmpegBatchCommand;
 use crate::shared::file_utils::{clear_and_create_folder, get_relative_path};
 use crate::shared::logo_handler::handle_logos;
 use crate::shared::logo_structs::Logo;
 use crate::shared::media_structs::{Media, Resolution};
+use crate::shared::media_validator::{
+    filter_valid_media_paths, read_media_paths_recursive, sort_by_file_size,
+};
 use crate::shared::process_manager::{check_process_cancelled, ProcessManager};
 use crate::shared::progress_handler::ProgressManager;
 use crate::ImageSettings;
@@ -82,7 +85,7 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
 
     ProgressManager::set_status("Sorting images by file size... (Step 4/7)".to_string());
     let sort_start = std::time::Instant::now();
-    sort_list_by_file_size(&mut image_list);
+    sort_by_file_size(&mut image_list);
     info!(
         "Sorting images by file size took: {:?}",
         sort_start.elapsed()
@@ -253,79 +256,6 @@ fn process_images_from_image_list(
     Ok(())
 }
 
-/// Split batches optimally to utilize all available threads
-fn split_batches_optimally(
-    batches: HashMap<BatchKey, Vec<Image>>,
-    target_threads: usize,
-) -> Vec<(BatchKey, Vec<Image>)> {
-    let mut work_units = Vec::new();
-
-    // Calculate total images and target images per work unit
-    let total_images: usize = batches.values().map(|v| v.len()).sum();
-    let target_images_per_unit = total_images.div_ceil(target_threads); // Ceiling division
-
-    // Minimum batch size to avoid too many tiny batches
-    let min_batch_size = std::cmp::max(1, target_images_per_unit / 4);
-
-    info!(
-        "Target images per work unit: {}, minimum batch size: {}",
-        target_images_per_unit, min_batch_size
-    );
-
-    for (batch_key, mut images) in batches {
-        if images.len() <= target_images_per_unit {
-            // Small batch, keep as is
-            work_units.push((batch_key, images));
-        } else {
-            // Large batch, split it
-            let num_splits = images.len().div_ceil(target_images_per_unit);
-            let actual_split_size = images.len().div_ceil(num_splits);
-
-            info!(
-                "Splitting batch of {} images into {} units of ~{} images each",
-                images.len(),
-                num_splits,
-                actual_split_size
-            );
-
-            // Sort images by file size within each batch for better load balancing
-            images.sort_by(|a, b| b.file_size.cmp(&a.file_size));
-
-            // Split using round-robin to distribute large and small files evenly
-            let mut splits: Vec<Vec<Image>> = vec![Vec::new(); num_splits];
-
-            for (index, image) in images.into_iter().enumerate() {
-                splits[index % num_splits].push(image);
-            }
-
-            // Add non-empty splits to work units
-            for split in splits {
-                if !split.is_empty() && split.len() >= min_batch_size {
-                    work_units.push((batch_key.clone(), split));
-                } else if !split.is_empty() {
-                    // If split is too small, try to merge with the last work unit of the same type
-                    if let Some(last_unit) = work_units
-                        .iter_mut()
-                        .rev()
-                        .find(|(key, _)| key == &batch_key)
-                    {
-                        last_unit.1.extend(split);
-                    } else {
-                        // If no existing unit to merge with, create a new one anyway
-                        work_units.push((batch_key.clone(), split));
-                    }
-                }
-            }
-        }
-    }
-
-    // Sort work units by size (largest first) for better scheduling
-    // This now happens AFTER all work units are created, ensuring proper ordering
-    work_units.sort_by(|a, b| b.1.len().cmp(&a.1.len()));
-
-    work_units
-}
-
 fn process_logos_for_image_resolutions(
     image_settings: &ImageSettings,
     image_list: &Vec<Image>,
@@ -355,8 +285,10 @@ fn read_image_paths_from_input_directory(
     input_directory: &Path,
     output_directory: &Path,
 ) -> Result<Vec<PathBuf>, Box<dyn Error + Send + Sync>> {
+    let validator = ImageSettingsValidator::new(image_settings);
+
     if image_settings.search_child_folders {
-        read_image_paths_recursive_parallel(input_directory, output_directory, image_settings)
+        read_media_paths_recursive(input_directory, output_directory, &validator)
     } else {
         let dir_read_start = std::time::Instant::now();
         let entries: Result<Vec<_>, _> = read_dir(input_directory)?.collect();
@@ -365,135 +297,13 @@ fn read_image_paths_from_input_directory(
 
         let filter_start = std::time::Instant::now();
         let entry_paths = entries.iter().map(|entry| entry.path());
-        let valid_image_paths = filter_valid_image_paths(
-            entry_paths,
-            input_directory,
-            output_directory,
-            image_settings,
-        );
+        let valid_image_paths =
+            filter_valid_media_paths(entry_paths, input_directory, output_directory, &validator);
         info!("Path filtering took: {:?}", filter_start.elapsed());
         info!("Found {} valid image paths", valid_image_paths.len());
 
         Ok(valid_image_paths)
     }
-}
-
-/// Determine if the image should be written to the output directory.
-///
-/// This is determined based on if the image already exists in the output directory and if it is allowed to be overwritten
-fn write_to_output_directory(
-    path: &Path,
-    input_directory: &Path,
-    output_directory: &Path,
-    image_settings: &ImageSettings,
-) -> bool {
-    if image_settings.overwrite_existing_files_output_directory {
-        return true;
-    }
-
-    // Get the file stem (filename without extension)
-    let file_stem = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("unknown");
-
-    // Get the target extension based on the format setting
-    let target_extension = &image_settings.format;
-
-    let target_filename = format!("{}.{}", file_stem, target_extension);
-
-    if image_settings.keep_child_folders_structure_in_output_directory {
-        let relative_image_path = get_relative_path(input_directory, path).unwrap();
-        let relative_dir_path = relative_image_path.parent().unwrap_or(Path::new(""));
-        let target_output_path = output_directory
-            .join(relative_dir_path)
-            .join(target_filename);
-        return !target_output_path.exists();
-    }
-
-    let target_output_path = output_directory.join(target_filename);
-    !target_output_path.exists()
-}
-
-fn is_supported_image_extension(path: &Path) -> bool {
-    if let Some(extension) = path.extension().and_then(|s| s.to_str()) {
-        IMAGE_FORMAT_REGISTRY.is_supported_for_reading(extension)
-    } else {
-        false
-    }
-}
-
-/// Recursively read all image paths from child directories in parallel using jwalk
-fn read_image_paths_recursive_parallel(
-    directory: &Path,
-    output_directory: &Path,
-    image_settings: &ImageSettings,
-) -> Result<Vec<PathBuf>, Box<dyn Error + Send + Sync>> {
-    let walk_start = std::time::Instant::now();
-
-    // Use jwalk for parallel directory walking with inline filtering
-    let valid_image_paths: Result<Vec<PathBuf>, Box<dyn Error + Send + Sync>> =
-        jwalk::WalkDir::new(directory)
-            .skip_hidden(false)
-            .into_iter()
-            .filter_map(|entry| {
-                // Check cancellation - if cancelled, convert to error that will propagate
-                if let Err(e) = check_process_cancelled() {
-                    return Some(Err(e));
-                }
-
-                let entry = match entry {
-                    Ok(e) => e,
-                    Err(_) => return None,
-                };
-
-                let path = entry.path();
-
-                if !is_valid_image_path(&path, directory, output_directory, image_settings) {
-                    return None;
-                }
-
-                Some(Ok(path))
-            })
-            .collect();
-
-    let valid_image_paths = valid_image_paths?;
-
-    info!(
-        "Directory walk and filtering took: {:?}",
-        walk_start.elapsed()
-    );
-    info!("Found {} valid image paths", valid_image_paths.len());
-
-    Ok(valid_image_paths)
-}
-
-/// Sorts the image list by file size in descending order (largest to smallest)
-fn sort_list_by_file_size(image_list: &mut [Image]) {
-    image_list.sort_by(|a, b| b.file_size.cmp(&a.file_size));
-}
-
-/// Filters paths to only include valid image files that should be processed
-fn filter_valid_image_paths(
-    paths: impl Iterator<Item = PathBuf>,
-    input_directory: &Path,
-    output_directory: &Path,
-    image_settings: &ImageSettings,
-) -> Vec<PathBuf> {
-    paths
-        .filter(|path| is_valid_image_path(path, input_directory, output_directory, image_settings))
-        .collect()
-}
-
-fn is_valid_image_path(
-    path: &Path,
-    input_directory: &Path,
-    output_directory: &Path,
-    image_settings: &ImageSettings,
-) -> bool {
-    path.is_file()
-        && is_supported_image_extension(path)
-        && write_to_output_directory(path, input_directory, output_directory, image_settings)
 }
 
 /// Creates Image objects from paths in parallel, filtering out failed creations
@@ -511,14 +321,13 @@ fn create_images_from_paths_parallel(
             match Image::new(path.clone()) {
                 Ok(image) => Some(Ok(image)),
                 Err(e) => {
-                    error!("Failed to load image {}: {}", path.display(), e);
+                    log::error!("Failed to load image {}: {}", path.display(), e);
                     None
                 }
             }
         })
         .collect()
 }
-
 pub fn create_image_ffmpeg_command_list(
     batch_data: &[(Image, PathBuf)],
     logo: Option<&Logo>,
@@ -541,7 +350,7 @@ pub fn create_image_ffmpeg_command_list(
     );
 
     // Process in chunks for better load balancing and more frequent progress bar progression
-    const CHUNK_SIZE: usize = 20;
+    const CHUNK_SIZE: usize = 10;
 
     if batch_data.len() <= CHUNK_SIZE {
         let batch_command =
@@ -582,7 +391,6 @@ fn create_image_ffmpeg_command(
         std::fs::create_dir_all(output_directory)?;
     }
 
-    // Build FFmpeg command for this chunk
     let mut cmd = FfmpegCommand::new();
 
     #[cfg(target_os = "windows")]
@@ -618,7 +426,7 @@ fn create_image_ffmpeg_command(
                 i, logo_idx, logo_ref.position.x, logo_ref.position.y, i
             ));
         } else {
-            // Just scale each image
+            // Scale each image without overlaying logo
             filter_parts.push(format!(
                 "[{}:v]scale={}:{}:flags=fast_bilinear[out{}]",
                 i, target_resolution.width, target_resolution.height, i

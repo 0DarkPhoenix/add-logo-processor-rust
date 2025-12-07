@@ -8,6 +8,7 @@ pub mod logo_handler;
 pub mod logo_processor;
 pub mod logo_structs;
 pub mod media_structs;
+pub mod media_validator;
 pub mod process_manager;
 pub mod progress_handler;
 pub mod progress_terminal_bar;
