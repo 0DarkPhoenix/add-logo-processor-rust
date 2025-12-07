@@ -17,6 +17,7 @@ pub struct Video {
     pub file_type: String,
     pub duration: f64,
     pub codec: String,
+    pub frame_count: usize,
 }
 
 impl Video {
@@ -35,6 +36,7 @@ impl Video {
                 "json",
                 "-show_format",
                 "-show_streams",
+                "-count_packets",
                 path.to_str().unwrap(),
             ])
             .output()?;
@@ -65,6 +67,11 @@ impl Video {
             .and_then(|d| d.parse::<f64>().ok())
             .unwrap_or(0.0);
 
+        let frame_count = video_stream["nb_read_packets"]
+            .as_str()
+            .and_then(|fc| fc.parse::<u64>().ok())
+            .unwrap_or(0) as usize;
+
         Ok(Self {
             file_path: path,
             resolution,
@@ -72,11 +79,16 @@ impl Video {
             file_type,
             duration,
             codec,
+            frame_count,
         })
     }
 
     pub fn get_duration(&self) -> f64 {
         self.duration
+    }
+
+    fn get_frame_count(&self) -> usize {
+        self.frame_count
     }
 
     pub fn set_codec(&mut self, new_codec: String) {

@@ -15,7 +15,7 @@ use crate::shared::media_validator::{
     sort_by_file_size,
 };
 use crate::shared::process_manager::{check_process_cancelled, ProcessManager};
-use crate::shared::progress_handler::ProgressManager;
+use crate::shared::progress_handler::{ProgressManager, ProgressMode};
 use crate::video::video_structs::Video;
 use crate::video::video_validator::VideoSettingsValidator;
 use crate::VideoSettings;
@@ -111,8 +111,10 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
 
     check_process_cancelled()?;
 
+    let total_frame_count: usize = video_list.iter().map(|video| video.frame_count).sum();
+
     ProgressManager::set_status("Processing videos... (Step 7/7)".to_string());
-    ProgressManager::set_total(video_list.len());
+    ProgressManager::set_total(total_frame_count);
     let video_processing_start = std::time::Instant::now();
 
     process_videos_from_video_list(
@@ -195,7 +197,7 @@ fn process_videos_from_video_list(
     // Execute FFmpeg commands in parallel
     ffmpeg_command_list.into_iter().par_bridge().try_for_each(
         |mut ffmpeg_batch_command| -> Result<(), Box<dyn Error + Send + Sync>> {
-            spawn_ffmpeg_process(&mut ffmpeg_batch_command)?;
+            spawn_ffmpeg_process(&mut ffmpeg_batch_command, ProgressMode::PerFrame)?;
             Ok(())
         },
     )?;

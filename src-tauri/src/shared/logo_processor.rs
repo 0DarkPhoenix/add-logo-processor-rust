@@ -4,7 +4,10 @@ use ffmpeg_sidecar::command::FfmpegCommand;
 
 use crate::{
     image::image_struct::{apply_image_format_specific_args, read_image_resolution},
-    shared::{ffmpeg_logger::ffmpeg_logger, logo_structs::Logo, media_structs::Resolution},
+    shared::{
+        ffmpeg_logger::ffmpeg_logger, logo_structs::Logo, media_structs::Resolution,
+        progress_handler::ProgressMode,
+    },
 };
 
 pub fn process_logo(
@@ -70,7 +73,7 @@ fn resize_logo(
         .output(output_path.to_str().ok_or("Invalid output path")?)
         .spawn()?;
 
-    ffmpeg_logger(ffmpeg_child)?;
+    ffmpeg_logger(ffmpeg_child, ProgressMode::Batch)?;
 
     Ok(())
 }

@@ -6,6 +6,14 @@ use ts_rs::TS;
 
 use crate::shared::progress_terminal_bar::TerminalProgressBar;
 
+#[derive(Debug, Clone, Copy)]
+pub enum ProgressMode {
+    /// Increment progress once after completion (used for images)
+    Batch,
+    /// Increment progress per frame during processing (used for videos)
+    PerFrame,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/types/", rename_all = "camelCase")]
 #[serde(rename_all = "camelCase")]

@@ -17,7 +17,7 @@ use crate::shared::media_validator::{
     filter_valid_media_paths, read_media_paths_recursive, sort_by_file_size,
 };
 use crate::shared::process_manager::{check_process_cancelled, ProcessManager};
-use crate::shared::progress_handler::ProgressManager;
+use crate::shared::progress_handler::{ProgressManager, ProgressMode};
 use crate::ImageSettings;
 
 pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error + Send + Sync>> {
@@ -248,7 +248,7 @@ fn process_images_from_image_list(
     // Execute FFmpeg commands in parallel
     ffmpeg_command_list.into_iter().par_bridge().try_for_each(
         |mut ffmpeg_batch_command| -> Result<(), Box<dyn Error + Send + Sync>> {
-            spawn_ffmpeg_process(&mut ffmpeg_batch_command)?;
+            spawn_ffmpeg_process(&mut ffmpeg_batch_command, ProgressMode::Batch)?;
             Ok(())
         },
     )?;

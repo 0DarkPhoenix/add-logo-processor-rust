@@ -1,10 +1,10 @@
 use ffmpeg_sidecar::command::FfmpegCommand;
 
+#[derive(Debug)]
 pub struct FfmpegBatchCommand {
     pub command: FfmpegCommand,
     pub batch_size: usize,
 }
-
 /* -------------------------------------------------------------------------- */
 /*                                   FORMAT                                   */
 /* -------------------------------------------------------------------------- */
