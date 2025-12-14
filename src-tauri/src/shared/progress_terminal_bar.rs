@@ -1,6 +1,8 @@
 use std::io::{self, Write};
 use std::time::Duration;
 
+use crate::ProgressInfo;
+
 #[derive(Debug)]
 pub struct TerminalProgressBar {
     width: usize,
@@ -50,20 +52,21 @@ impl TerminalProgressBar {
         self
     }
 
-    pub fn display(
-        &mut self,
-        current: usize,
-        total: usize,
-        status: &str,
-        elapsed: Duration,
-        rate: f64,
-        eta: Option<Duration>,
-    ) {
-        let percentage = if total > 0 {
-            (current as f64 / total as f64) * 100.0
-        } else {
-            0.0
-        };
+    pub fn display(&mut self, progress_info: &ProgressInfo) {
+        let ProgressInfo {
+            current,
+            total,
+            percentage,
+            ref unit,
+            elapsed_time,
+            estimated_remaining,
+            items_per_second,
+            ref status,
+            alternative_current,
+            alternative_total,
+            ref alternative_unit,
+            ..
+        } = *progress_info;
 
         let is_complete = current >= total && total > 0;
 
@@ -95,18 +98,25 @@ impl TerminalProgressBar {
             info_parts.push(format!("{:.1}%", percentage));
         }
 
-        info_parts.push(format!("{}/{}", current, total));
+        info_parts.push(format!("{}/{} {}", current, total, unit));
 
-        if self.show_elapsed {
-            info_parts.push(format!("elapsed: {}", Self::format_duration(elapsed)));
+        if self.show_rate && items_per_second > 0.0 {
+            info_parts.push(format!("{:.1} {}/s", items_per_second, unit));
         }
 
-        if self.show_rate && rate > 0.0 {
-            info_parts.push(format!("{:.1} items/s", rate));
+        if alternative_total > 0 {
+            info_parts.push(format!(
+                "{}/{} {}",
+                alternative_current, alternative_total, alternative_unit
+            ));
+        }
+
+        if self.show_elapsed {
+            info_parts.push(format!("elapsed: {}", Self::format_duration(elapsed_time)));
         }
 
         if self.show_eta {
-            if let Some(eta_duration) = eta {
+            if let Some(eta_duration) = estimated_remaining {
                 info_parts.push(format!("ETA: {}", Self::format_duration(eta_duration)));
             }
         }

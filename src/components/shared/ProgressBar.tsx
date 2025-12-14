@@ -108,17 +108,24 @@ export default function ProgressBar({ isProcessing }: ProgressBarProps) {
 		<div className='mt-1'>
 			<div className='flex justify-around items-center text-sm'>
 				<span className='font-medium'>{progressInfo.status}</span>
-				<span>{progressInfo.itemsPerSecond.toFixed(1)} items/sec</span>
+				<span>
+					{progressInfo.itemsPerSecond.toFixed(1)} {progressInfo.unit}/sec
+				</span>
+				<span className='text-muted-foreground'>
+					{progressInfo.current} / {progressInfo.total} {progressInfo.unit}
+				</span>
+				{progressInfo.alternativeTotal > 0 && (
+					<span>
+						{progressInfo.alternativeCurrent} / {progressInfo.alternativeTotal}{" "}
+						{progressInfo.alternativeUnit}
+					</span>
+				)}
 				<div className='flex gap-4'>
 					<span>Elapsed: {formatTime(progressInfo.elapsedTime)}</span>
 					{progressInfo.estimatedRemaining && (
 						<span>Remaining: {formatTime(progressInfo.estimatedRemaining)}</span>
 					)}
 				</div>
-				<span className='text-muted-foreground'>
-					{progressInfo.current} / {progressInfo.total} (
-					{progressInfo.percentage.toFixed(1)}%)
-				</span>
 			</div>
 
 			<Progress value={Math.round(progressInfo.percentage * 100) / 100} className='w-full' />

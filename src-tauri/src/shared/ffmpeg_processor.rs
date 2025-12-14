@@ -14,9 +14,15 @@ pub fn spawn_ffmpeg_process(
 
     ffmpeg_logger(ffmpeg_child, progress_mode)?;
 
-    // For batch mode (images), increment after completion
-    if matches!(progress_mode, ProgressMode::Batch) {
-        ProgressManager::increment_progress(ffmpeg_batch_command.batch_size);
+    match progress_mode {
+        ProgressMode::Batch => {
+            // Increment progress for image process
+            ProgressManager::increment_progress(ffmpeg_batch_command.batch_size);
+        }
+        ProgressMode::PerFrame => {
+            // Increment alternative progress for video process
+            ProgressManager::increment_alternative_progress(1);
+        }
     }
 
     Ok(())

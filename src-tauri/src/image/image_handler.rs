@@ -34,6 +34,9 @@ pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error
     ProgressManager::start_progress_with_terminal(
         "Clearing and creating output folder... (Step 1/7)".to_string(),
         None,
+        Some("images".to_string()),
+        None,
+        None,
     );
 
     check_process_cancelled()?;

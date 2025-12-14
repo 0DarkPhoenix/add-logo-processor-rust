@@ -21,6 +21,7 @@ pub struct ProgressInfo {
     pub current: usize,
     pub total: usize,
     pub percentage: f64,
+    pub unit: String,
     #[ts(type = "number")]
     #[serde(serialize_with = "serialize_duration_as_secs")]
     pub elapsed_time: Duration,
@@ -29,6 +30,9 @@ pub struct ProgressInfo {
     pub estimated_remaining: Option<Duration>,
     pub items_per_second: f64,
     pub status: String,
+    pub alternative_current: usize,
+    pub alternative_total: usize,
+    pub alternative_unit: String,
 }
 
 fn serialize_duration_as_secs<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
@@ -52,15 +56,25 @@ where
 }
 
 impl ProgressInfo {
-    pub fn new(status: String, total: Option<usize>) -> Self {
+    pub fn new(
+        status: String,
+        total: Option<usize>,
+        unit: Option<String>,
+        alternative_total: Option<usize>,
+        alternative_unit: Option<String>,
+    ) -> Self {
         Self {
             current: 0,
             total: total.unwrap_or(0),
+            unit: unit.unwrap_or("items".to_string()),
             percentage: 0.0,
             elapsed_time: Duration::from_secs(0),
             estimated_remaining: None,
             items_per_second: 0.0,
             status,
+            alternative_current: 0,
+            alternative_total: alternative_total.unwrap_or(0),
+            alternative_unit: alternative_unit.unwrap_or("items".to_string()),
         }
     }
 }
@@ -74,9 +88,21 @@ pub struct ProgressTracker {
 }
 
 impl ProgressTracker {
-    pub fn new(status: String, total: Option<usize>) -> Self {
+    pub fn new(
+        status: String,
+        total: Option<usize>,
+        unit: Option<String>,
+        alternative_total: Option<usize>,
+        alternative_unit: Option<String>,
+    ) -> Self {
         Self {
-            info: Arc::new(Mutex::new(ProgressInfo::new(status, total))),
+            info: Arc::new(Mutex::new(ProgressInfo::new(
+                status,
+                total,
+                unit,
+                alternative_total,
+                alternative_unit,
+            ))),
             start_time: Instant::now(),
             terminal_bar: None,
             is_finished: Arc::new(Mutex::new(false)),
@@ -107,16 +133,34 @@ impl ProgressTracker {
         self.display_terminal_progress(&info);
     }
 
-    pub fn set_status(&self, status: String) {
-        let mut info = self.info.lock().unwrap();
-        info.status = status;
-        self.display_terminal_progress(&info);
-    }
-
     pub fn set_total(&self, total: usize) {
         let mut info = self.info.lock().unwrap();
         info.total = total;
         self.update_calculations(&mut info);
+        self.display_terminal_progress(&info);
+    }
+
+    pub fn increment_alternative(&self, value: usize) {
+        let mut info = self.info.lock().unwrap();
+        info.alternative_current += value;
+        self.display_terminal_progress(&info);
+    }
+
+    pub fn set_alternative_current(&self, current: usize) {
+        let mut info = self.info.lock().unwrap();
+        info.alternative_current = current;
+        self.display_terminal_progress(&info);
+    }
+
+    pub fn set_alternative_total(&self, total: usize) {
+        let mut info = self.info.lock().unwrap();
+        info.alternative_total = total;
+        self.display_terminal_progress(&info);
+    }
+
+    pub fn set_status(&self, status: String) {
+        let mut info = self.info.lock().unwrap();
+        info.status = status;
         self.display_terminal_progress(&info);
     }
 
@@ -174,14 +218,7 @@ impl ProgressTracker {
 
     fn display_terminal_progress(&self, info: &ProgressInfo) {
         if let Some(ref bar_cell) = self.terminal_bar {
-            bar_cell.borrow_mut().display(
-                info.current,
-                info.total,
-                &info.status,
-                info.elapsed_time,
-                info.items_per_second,
-                info.estimated_remaining,
-            );
+            bar_cell.borrow_mut().display(info);
         }
     }
 }
@@ -194,14 +231,29 @@ lazy_static::lazy_static! {
 pub struct ProgressManager;
 
 impl ProgressManager {
-    pub fn start_progress(status: String, total: Option<usize>) {
-        let tracker = ProgressTracker::new(status, total);
+    pub fn start_progress(
+        status: String,
+        total: Option<usize>,
+        unit: Option<String>,
+        alternative_total: Option<usize>,
+        alternative_unit: Option<String>,
+    ) {
+        let tracker =
+            ProgressTracker::new(status, total, unit, alternative_total, alternative_unit);
         let mut global = GLOBAL_PROGRESS.lock().unwrap();
         *global = Some(tracker);
     }
 
-    pub fn start_progress_with_terminal(status: String, total: Option<usize>) {
-        let tracker = ProgressTracker::new(status, total).with_terminal_display();
+    pub fn start_progress_with_terminal(
+        status: String,
+        total: Option<usize>,
+        unit: Option<String>,
+        alternative_total: Option<usize>,
+        alternative_unit: Option<String>,
+    ) {
+        let tracker =
+            ProgressTracker::new(status, total, unit, alternative_total, alternative_unit)
+                .with_terminal_display();
         let mut global = GLOBAL_PROGRESS.lock().unwrap();
         *global = Some(tracker);
     }
@@ -209,9 +261,14 @@ impl ProgressManager {
     pub fn start_progress_with_custom_terminal(
         status: String,
         total: Option<usize>,
+        unit: Option<String>,
+        alternative_total: Option<usize>,
+        alternative_unit: Option<String>,
         bar: TerminalProgressBar,
     ) {
-        let tracker = ProgressTracker::new(status, total).with_custom_terminal_bar(bar);
+        let tracker =
+            ProgressTracker::new(status, total, unit, alternative_total, alternative_unit)
+                .with_custom_terminal_bar(bar);
         let mut global = GLOBAL_PROGRESS.lock().unwrap();
         *global = Some(tracker);
     }
@@ -230,17 +287,38 @@ impl ProgressManager {
         }
     }
 
-    pub fn set_status(status: String) {
-        let global = GLOBAL_PROGRESS.lock().unwrap();
-        if let Some(tracker) = global.as_ref() {
-            tracker.set_status(status);
-        }
-    }
-
     pub fn set_total(total: usize) {
         let global = GLOBAL_PROGRESS.lock().unwrap();
         if let Some(tracker) = global.as_ref() {
             tracker.set_total(total);
+        }
+    }
+
+    pub fn increment_alternative_progress(value: usize) {
+        let global = GLOBAL_PROGRESS.lock().unwrap();
+        if let Some(tracker) = global.as_ref() {
+            tracker.increment_alternative(value);
+        }
+    }
+
+    pub fn set_alternative_current(current: usize) {
+        let global = GLOBAL_PROGRESS.lock().unwrap();
+        if let Some(tracker) = global.as_ref() {
+            tracker.set_alternative_current(current);
+        }
+    }
+
+    pub fn set_alternative_total(total: usize) {
+        let global = GLOBAL_PROGRESS.lock().unwrap();
+        if let Some(tracker) = global.as_ref() {
+            tracker.set_alternative_total(total);
+        }
+    }
+
+    pub fn set_status(status: String) {
+        let global = GLOBAL_PROGRESS.lock().unwrap();
+        if let Some(tracker) = global.as_ref() {
+            tracker.set_status(status);
         }
     }
 
@@ -273,7 +351,6 @@ impl ProgressManager {
         }
     }
 
-    // New method to check if progress exists and is active
     pub fn has_active_progress() -> bool {
         let global = GLOBAL_PROGRESS.lock().unwrap();
         global
@@ -281,7 +358,6 @@ impl ProgressManager {
             .is_some_and(|tracker| !tracker.is_finished())
     }
 
-    // New method to get progress only if it's active
     pub fn get_active_progress() -> Option<ProgressInfo> {
         let global = GLOBAL_PROGRESS.lock().unwrap();
         global.as_ref().and_then(|tracker| {

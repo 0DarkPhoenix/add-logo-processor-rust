@@ -66,6 +66,15 @@ export default function VideoProcessingPage() {
 		}
 	};
 
+	const handleCancelProcessing = async () => {
+		try {
+			await invoke("cancel_process");
+			setIsProcessing(false);
+		} catch (error) {
+			console.error("Failed to cancel processing:", error);
+		}
+	};
+
 	return (
 		<>
 			<div className='flex-1 flex align-center gap-6 min-w-0'>
@@ -80,7 +89,12 @@ export default function VideoProcessingPage() {
 
 						<LogoConfiguratorCard />
 
-						<Button type='submit' variant='default' disabled={isProcessing}>
+						<Button
+							type={isProcessing ? "button" : "submit"}
+							variant={isProcessing ? "destructive" : "default"}
+							disabled={false}
+							onClick={isProcessing ? handleCancelProcessing : undefined}
+						>
 							{isProcessing ? "Cancel processing" : "Process Videos"}
 						</Button>
 					</form>

@@ -34,6 +34,9 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
     ProgressManager::start_progress_with_terminal(
         "Clearing and creating output folder... (Step 1/6)".to_string(),
         None,
+        Some("frames".to_string()),
+        None,
+        Some("videos".to_string()),
     );
 
     check_process_cancelled()?;
@@ -115,6 +118,7 @@ pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error
 
     ProgressManager::set_status("Processing videos... (Step 7/7)".to_string());
     ProgressManager::set_total(total_frame_count);
+    ProgressManager::set_alternative_total(video_list.len());
     let video_processing_start = std::time::Instant::now();
 
     process_videos_from_video_list(
