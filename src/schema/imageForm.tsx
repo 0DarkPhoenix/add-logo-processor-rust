@@ -1,24 +1,6 @@
 import * as z from "zod";
 import type { ImageSettings } from "../types/ImageSettings";
 
-type ImageFormat = ImageSettings["format"];
-export const imageFormats: ImageFormat[] = [
-	"png",
-	"jpeg",
-	"webp",
-	"bmp",
-	"gif",
-	"tiff",
-	"ico",
-	"pnm",
-	"tga",
-	"hdr",
-	"exr",
-	"ff",
-	"avif",
-	"qoi",
-] as const;
-
 type LogoCorner = ImageSettings["logoCorner"];
 export const logoCorners: LogoCorner[] = [
 	"topLeft",
@@ -48,7 +30,7 @@ export const imageFormSchema = z
 		logoYOffsetScale: z.number().max(100, "Logo Y offset scale can't be higher than 100"),
 		logoCorner: z.enum(logoCorners),
 		shouldConvertFormat: z.boolean(),
-		format: z.enum(imageFormats),
+		format: z.string({ error: "Selecting a format is required." }),
 		clearFilesInputDirectory: z.boolean(),
 		clearFilesOutputDirectory: z.boolean(),
 		overwriteExistingFilesOutputDirectory: z.boolean(),

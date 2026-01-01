@@ -11,10 +11,13 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { imageFormats } from "@/schema/imageForm";
 import type { ImageSettings } from "@/types/ImageSettings";
 
-export function ImageResizeDimensionsCard() {
+export function ImageResizeDimensionsCard({
+	supportedImageFormats,
+}: {
+	supportedImageFormats: string[];
+}) {
 	const { setValue, watch } = useFormContext<ImageSettings>();
 	const baseId = useId();
 
@@ -60,16 +63,19 @@ export function ImageResizeDimensionsCard() {
 						</Label>
 						<Select
 							value={format}
-							onValueChange={(value) =>
-								setValue("format", value as ImageSettings["format"])
-							}
+							onValueChange={(value) => {
+								// Guard against empty string on initial render
+								if (value) {
+									setValue("format", value);
+								}
+							}}
 							disabled={!shouldConvertFormat}
 						>
 							<SelectTrigger id={`${baseId}-format`} className='mt-1'>
-								<SelectValue placeholder='Select output format...' />
+								<SelectValue placeholder='Select format...' />
 							</SelectTrigger>
 							<SelectContent>
-								{imageFormats.map((format) => (
+								{supportedImageFormats.map((format) => (
 									<SelectItem key={format} value={format}>
 										{format.toUpperCase()}
 									</SelectItem>

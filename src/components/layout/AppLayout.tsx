@@ -1,3 +1,4 @@
+import { Camera, Video } from "lucide-react";
 import type * as React from "react";
 import { Button } from "../ui/button";
 
@@ -19,7 +20,8 @@ export function AppLayout({ children, currentPage, onPageChange }: AppLayoutProp
 							onClick={() => onPageChange("image")}
 							className='rounded-full'
 						>
-							📷 Images
+							<Camera className='mr-2 h-6 w-6' />
+							Images
 						</Button>
 						<Button
 							variant={currentPage === "video" ? "default" : "outline"}
@@ -27,7 +29,8 @@ export function AppLayout({ children, currentPage, onPageChange }: AppLayoutProp
 							onClick={() => onPageChange("video")}
 							className='rounded-full'
 						>
-							🎥 Videos
+							<Video className='mr-2 h-6 w-6' />
+							Videos
 						</Button>
 					</div>
 				</nav>

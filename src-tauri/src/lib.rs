@@ -55,7 +55,10 @@ pub fn run() {
             commands::get_progress_info,
             commands::cancel_process,
             commands::process_images,
-            commands::process_videos
+            commands::get_supported_image_formats,
+            commands::process_videos,
+            commands::get_supported_video_formats,
+            commands::get_supported_video_codecs
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")

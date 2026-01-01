@@ -11,10 +11,15 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { videoCodecs, videoFormats } from "@/schema/videoForm";
 import type { VideoSettings } from "@/types/VideoSettings";
 
-export function VideoResizeDimensionsCard() {
+export function VideoResizeDimensionsCard({
+	supportedVideoFormats,
+	supportedVideoCodecs,
+}: {
+	supportedVideoFormats: string[];
+	supportedVideoCodecs: string[];
+}) {
 	const { setValue, watch } = useFormContext<VideoSettings>();
 	const baseId = useId();
 
@@ -62,16 +67,19 @@ export function VideoResizeDimensionsCard() {
 						</Label>
 						<Select
 							value={format}
-							onValueChange={(value) =>
-								setValue("format", value as VideoSettings["format"])
-							}
+							onValueChange={(value) => {
+								// Guard against empty string on initial render
+								if (value) {
+									setValue("format", value);
+								}
+							}}
 							disabled={!shouldConvertFormat}
 						>
 							<SelectTrigger id={`${baseId}-format`} className='mt-1'>
 								<SelectValue placeholder='Select output format...' />
 							</SelectTrigger>
 							<SelectContent>
-								{videoFormats.map((format) => (
+								{supportedVideoFormats.map((format) => (
 									<SelectItem key={format} value={format}>
 										{format.toUpperCase()}
 									</SelectItem>
@@ -98,16 +106,19 @@ export function VideoResizeDimensionsCard() {
 						</Label>
 						<Select
 							value={codec}
-							onValueChange={(value) =>
-								setValue("codec", value as VideoSettings["codec"])
-							}
+							onValueChange={(value) => {
+								// Guard against empty string on initial render
+								if (value) {
+									setValue("format", value);
+								}
+							}}
 							disabled={!shouldConvertCodec}
 						>
 							<SelectTrigger id={`${baseId}-codec`} className='mt-1'>
 								<SelectValue placeholder='Select output codec...' />
 							</SelectTrigger>
 							<SelectContent>
-								{videoCodecs.map((codec) => (
+								{supportedVideoCodecs.map((codec) => (
 									<SelectItem key={codec} value={codec}>
 										{codec.toUpperCase()}
 									</SelectItem>

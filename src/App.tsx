@@ -1,6 +1,8 @@
+import { Camera, Video } from "lucide-react";
 import { useState } from "react";
 import { AppLayout } from "./components/layout/AppLayout";
 import { Button } from "./components/ui/button";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import ImageProcessingPage from "./pages/image/index";
 import VideoProcessingPage from "./pages/video/index";
 
@@ -9,7 +11,7 @@ type Page = "home" | "image" | "video";
 function App() {
 	const [currentPage, setCurrentPage] = useState<Page>("home");
 
-	const renderPage = () => {
+	function Page() {
 		switch (currentPage) {
 			case "image":
 				return (
@@ -40,7 +42,9 @@ function App() {
 										onClick={() => setCurrentPage("image")}
 									>
 										<div className='flex flex-col items-center gap-1'>
-											<span>📷</span>
+											<span>
+												<Camera className='mr-2 h-6 w-6' />
+											</span>
 											<span>Process Images</span>
 										</div>
 									</Button>
@@ -52,7 +56,9 @@ function App() {
 										onClick={() => setCurrentPage("video")}
 									>
 										<div className='flex flex-col items-center gap-1'>
-											<span>🎥</span>
+											<span>
+												<Video className='mr-2 h-6 w-6' />
+											</span>
 											<span>Process Videos</span>
 										</div>
 									</Button>
@@ -66,9 +72,13 @@ function App() {
 					</AppLayout>
 				);
 		}
-	};
+	}
 
-	return renderPage();
+	return (
+		<SettingsProvider>
+			<Page />
+		</SettingsProvider>
+	);
 }
 
 export default App;

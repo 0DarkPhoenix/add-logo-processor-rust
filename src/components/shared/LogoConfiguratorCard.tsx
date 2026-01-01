@@ -6,11 +6,12 @@ import { Label } from "@/components/ui/label";
 import { FileInput } from "@/components/ui/path-input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
-import { imageFormats } from "@/schema/imageForm";
+import { useSettings } from "@/contexts/SettingsContext";
 import type { ImageSettings } from "@/types/ImageSettings";
 
 export function LogoConfiguratorCard() {
 	const { setValue, watch } = useFormContext<ImageSettings>();
+	const { supportedImageFormats } = useSettings();
 	const baseId = useId();
 
 	const addLogo = watch("addLogo");
@@ -44,7 +45,7 @@ export function LogoConfiguratorCard() {
 					<FileInput
 						id={`${baseId}-logoPath`}
 						placeholder='Select logo file...'
-						accept={imageFormats.join(", ")}
+						accept={supportedImageFormats.join(", ")}
 						value={logoPath || ""}
 						onChange={(path) => setValue("logoPath", path)}
 						className='mt-1'

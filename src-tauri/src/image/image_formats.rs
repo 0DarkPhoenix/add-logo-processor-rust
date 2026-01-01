@@ -171,8 +171,8 @@ pub mod image_format {
 
     // All supported formats in a single array
     pub const ALL: &[ImageFormat] = &[
-        PNG, JPEG, WEBP, BMP, GIF, TIFF, ICO, PNM, TGA, HDR, EXR, AVIF, QOI, APNG, PAM, PBM, PCX,
-        PGM, PPM, PSD, SGI, SVG, XBM, XPM, JPEGXL, DDS,
+        APNG, AVIF, BMP, DDS, EXR, GIF, HDR, ICO, JPEG, JPEGXL, PAM, PBM, PCX, PGM, PNG, PNM, PPM,
+        PSD, QOI, SGI, SVG, TGA, TIFF, WEBP, XBM, XPM,
     ];
 }
 

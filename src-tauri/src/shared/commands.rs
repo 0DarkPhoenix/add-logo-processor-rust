@@ -1,12 +1,18 @@
 use tauri::State;
 
 use crate::{
-    image::image_handler::handle_images,
+    image::{image_formats::IMAGE_FORMAT_REGISTRY, image_handler::handle_images},
     shared::{process_manager::ProcessManager, progress_handler::ProgressManager},
-    video::video_handler::handle_videos,
+    video::{
+        video_codecs::VIDEO_CODEC_REGISTRY, video_formats::VIDEO_FORMAT_REGISTRY,
+        video_handler::handle_videos,
+    },
     AppConfig, AppState, ImageSettings, ProgressInfo, VideoSettings,
 };
 
+/* -------------------------------------------------------------------------- */
+/*                                   GENERAL                                  */
+/* -------------------------------------------------------------------------- */
 #[tauri::command]
 pub fn load_config() -> Result<AppConfig, String> {
     Ok(AppConfig::global())
@@ -29,6 +35,9 @@ pub fn cancel_process() -> Result<(), String> {
     Ok(())
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                   IMAGES                                   */
+/* -------------------------------------------------------------------------- */
 #[tauri::command(async)]
 pub fn process_images(
     app_state: State<AppState>,
@@ -42,6 +51,19 @@ pub fn process_images(
     Ok(())
 }
 
+#[tauri::command]
+pub fn get_supported_image_formats() -> Result<Vec<String>, String> {
+    let formats = IMAGE_FORMAT_REGISTRY
+        .get_writable_formats()
+        .iter()
+        .map(|format| format.name.to_string())
+        .collect();
+    Ok(formats)
+}
+
+/* -------------------------------------------------------------------------- */
+/*                                   VIDEOS                                   */
+/* -------------------------------------------------------------------------- */
 #[tauri::command(async)]
 pub fn process_videos(
     app_state: State<AppState>,
@@ -53,4 +75,24 @@ pub fn process_videos(
     handle_videos(&video_settings).map_err(|e| e.to_string())?;
 
     Ok(())
+}
+
+#[tauri::command]
+pub fn get_supported_video_formats() -> Result<Vec<String>, String> {
+    let formats = VIDEO_FORMAT_REGISTRY
+        .get_writable_formats()
+        .iter()
+        .map(|format| format.name.to_string())
+        .collect();
+    Ok(formats)
+}
+
+#[tauri::command]
+pub fn get_supported_video_codecs() -> Result<Vec<String>, String> {
+    let codecs = VIDEO_CODEC_REGISTRY
+        .get_codecs_with_encoding()
+        .iter()
+        .map(|codec| codec.name.to_string())
+        .collect();
+    Ok(codecs)
 }

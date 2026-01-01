@@ -6,17 +6,20 @@ import { ImageResizeDimensionsCard } from "@/components/image-components/ImagePr
 import { LogoConfiguratorCard } from "@/components/shared/LogoConfiguratorCard";
 import ProgressBar from "@/components/shared/ProgressBar";
 import { Button } from "@/components/ui/button";
-import type { AppConfig } from "@/types/AppConfig";
+import { useSettings } from "@/contexts/SettingsContext";
 import { DirectorySelectionCard } from "../../components/shared/DirectorySelectionCard";
 import { Form } from "../../components/ui/form";
-import { imageFormats, imageFormSchema, logoCorners } from "../../schema/imageForm";
+import { imageFormSchema, logoCorners } from "../../schema/imageForm";
 import type { ImageSettings } from "../../types/ImageSettings";
 
 export default function ImageProcessingPage() {
 	const [isProcessing, setIsProcessing] = useState(false);
+	const { imageSettings, supportedImageFormats, isInitialized, updateImageSettings } =
+		useSettings();
 
 	const form = useForm<ImageSettings>({
 		resolver: zodResolver(imageFormSchema),
+		values: isInitialized && imageSettings ? imageSettings : undefined,
 		defaultValues: {
 			inputDirectory: "",
 			outputDirectory: "",
@@ -30,30 +33,29 @@ export default function ImageProcessingPage() {
 			logoYOffsetScale: 0,
 			logoCorner: logoCorners[0],
 			shouldConvertFormat: false,
-			format: imageFormats[0],
+			format: "",
 			clearFilesInputDirectory: false,
 			clearFilesOutputDirectory: false,
 			overwriteExistingFilesOutputDirectory: false,
 		},
 	});
 
-	// Load config on component mount
+	// Initialize form values once settings are loaded
 	useEffect(() => {
-		const loadConfig = async () => {
-			try {
-				const config: AppConfig = await invoke("load_config");
-				// Reset form with config values, keeping the current form structure
-				form.reset({
-					...form.getValues(),
-					...config.imageSettings,
-				});
-			} catch (error) {
-				console.error("Failed to load config:", error);
-			}
-		};
+		if (isInitialized && imageSettings) {
+			form.reset(imageSettings);
+		}
+	}, [isInitialized, imageSettings, form.reset]);
 
-		loadConfig();
-	}, [form]);
+	// Update context when form changes
+	useEffect(() => {
+		const subscription = form.watch((data) => {
+			if (isInitialized) {
+				updateImageSettings(data as ImageSettings);
+			}
+		});
+		return () => subscription.unsubscribe();
+	}, [form, isInitialized, updateImageSettings]);
 
 	const onSubmit = async (data: ImageSettings) => {
 		setIsProcessing(true);
@@ -85,7 +87,7 @@ export default function ImageProcessingPage() {
 					>
 						<DirectorySelectionCard />
 
-						<ImageResizeDimensionsCard />
+						<ImageResizeDimensionsCard supportedImageFormats={supportedImageFormats} />
 
 						<LogoConfiguratorCard />
 
