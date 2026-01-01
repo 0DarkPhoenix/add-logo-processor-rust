@@ -10,7 +10,7 @@ import { VideoResizeDimensionsCard } from "@/components/video-components/VideoPr
 import { useSettings } from "@/contexts/SettingsContext";
 import { DirectorySelectionCard } from "../../components/shared/DirectorySelectionCard";
 import { Form } from "../../components/ui/form";
-import { logoCorners, videoFormSchema } from "../../schema/videoForm";
+import { videoFormSchema } from "../../schema/videoForm";
 import type { VideoSettings } from "../../types/VideoSettings";
 
 export default function VideoProcessingPage() {
@@ -25,34 +25,8 @@ export default function VideoProcessingPage() {
 
 	const form = useForm<VideoSettings>({
 		resolver: zodResolver(videoFormSchema),
-		defaultValues: {
-			inputDirectory: "",
-			outputDirectory: "",
-			searchChildFolders: false,
-			keepChildFoldersStructureInOutputDirectory: false,
-			minPixelCount: 1,
-			addLogo: false,
-			logoPath: null,
-			logoScale: 10,
-			logoXOffsetScale: 0,
-			logoYOffsetScale: 0,
-			logoCorner: logoCorners[0],
-			shouldConvertFormat: false,
-			format: "",
-			clearFilesInputDirectory: false,
-			clearFilesOutputDirectory: false,
-			overwriteExistingFilesOutputDirectory: false,
-			shouldConvertCodec: false,
-			codec: "",
-		},
+		values: isInitialized && videoSettings ? videoSettings : undefined,
 	});
-
-	// Initialize form values once settings are loaded
-	useEffect(() => {
-		if (isInitialized && videoSettings) {
-			form.reset(videoSettings);
-		}
-	}, [isInitialized, videoSettings, form.reset]);
 
 	// Update context when form changes
 	useEffect(() => {

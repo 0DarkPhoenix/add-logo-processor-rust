@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useSettings } from "@/contexts/SettingsContext";
 import { DirectorySelectionCard } from "../../components/shared/DirectorySelectionCard";
 import { Form } from "../../components/ui/form";
-import { imageFormSchema, logoCorners } from "../../schema/imageForm";
+import { imageFormSchema } from "../../schema/imageForm";
 import type { ImageSettings } from "../../types/ImageSettings";
 
 export default function ImageProcessingPage() {
@@ -20,32 +20,7 @@ export default function ImageProcessingPage() {
 	const form = useForm<ImageSettings>({
 		resolver: zodResolver(imageFormSchema),
 		values: isInitialized && imageSettings ? imageSettings : undefined,
-		defaultValues: {
-			inputDirectory: "",
-			outputDirectory: "",
-			searchChildFolders: false,
-			keepChildFoldersStructureInOutputDirectory: false,
-			minPixelCount: 1,
-			addLogo: false,
-			logoPath: null,
-			logoScale: 10,
-			logoXOffsetScale: 0,
-			logoYOffsetScale: 0,
-			logoCorner: logoCorners[0],
-			shouldConvertFormat: false,
-			format: "",
-			clearFilesInputDirectory: false,
-			clearFilesOutputDirectory: false,
-			overwriteExistingFilesOutputDirectory: false,
-		},
 	});
-
-	// Initialize form values once settings are loaded
-	useEffect(() => {
-		if (isInitialized && imageSettings) {
-			form.reset(imageSettings);
-		}
-	}, [isInitialized, imageSettings, form.reset]);
 
 	// Update context when form changes
 	useEffect(() => {
