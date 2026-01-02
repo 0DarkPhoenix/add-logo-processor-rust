@@ -10,33 +10,33 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, currentPage, onPageChange }: AppLayoutProps) {
 	return (
-		<div className='min-h-screen bg-background flex flex-col'>
+		<div className='bg-background flex flex-col'>
 			{onPageChange && (
 				<nav className=' px-6 py-3 flex-shrink-0'>
-					<div className='flex justify-center gap-8'>
+					<div className='flex justify-center gap-4'>
 						<Button
-							variant={currentPage === "image" ? "default" : "outline"}
-							size='sm'
+							variant={currentPage === "image" ? "purpleOutline" : "outline"}
+							size='lg'
 							onClick={() => onPageChange("image")}
 							className='rounded-full'
 						>
-							<Camera className='mr-2 h-6 w-6' />
+							<Camera className='mr-1 h-8 w-8' />
 							Images
 						</Button>
 						<Button
-							variant={currentPage === "video" ? "default" : "outline"}
-							size='sm'
+							variant={currentPage === "video" ? "purpleOutline" : "outline"}
+							size='lg'
 							onClick={() => onPageChange("video")}
 							className='rounded-full'
 						>
-							<Video className='mr-2 h-6 w-6' />
+							<Video className='mr-1 h-8 w-8' />
 							Videos
 						</Button>
 					</div>
 				</nav>
 			)}
-			<main className='flex-1 px-6 overflow-auto'>
-				<div className='container mx-auto h-full'>{children}</div>
+			<main className='flex-1 px-6 flex justify-center items-center'>
+				<div className='container mx-auto h-full w-full'>{children}</div>
 			</main>
 		</div>
 	);

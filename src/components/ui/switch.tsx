@@ -39,9 +39,9 @@ function Switch({
 	// Use hardcoded colors that work in both light and dark mode
 	const getBackgroundColor = () => {
 		if (checked) {
-			return "#3569bb"; // Blue when checked
+			return "#396cd8"; // Blue when checked
 		}
-		return "#9f9fa0"; // Light gray when unchecked
+		return "#6d6d6d"; // Light gray when unchecked
 	};
 
 	const getThumbColor = () => {

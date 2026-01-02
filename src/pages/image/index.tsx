@@ -54,7 +54,7 @@ export default function ImageProcessingPage() {
 
 	return (
 		<>
-			<div className='flex-1 flex align-center gap-6 min-w-0'>
+			<div className='flex-1 flex align-center gap-6'>
 				<Form {...form}>
 					<form
 						onSubmit={form.handleSubmit(onSubmit)}

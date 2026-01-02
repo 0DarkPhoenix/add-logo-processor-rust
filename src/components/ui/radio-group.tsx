@@ -31,7 +31,7 @@ function RadioGroupItem({
 			{...props}
 		>
 			<RadioGroupPrimitive.Indicator className='flex items-center justify-center'>
-				<div className='h-3 w-3 rounded-full bg-current' />
+				<div className='h-2 w-2 rounded-full bg-current' />
 			</RadioGroupPrimitive.Indicator>
 		</RadioGroupPrimitive.Item>
 	);

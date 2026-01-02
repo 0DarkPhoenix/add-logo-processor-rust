@@ -51,7 +51,6 @@ function App() {
 
 									<Button
 										size='lg'
-										variant='outline'
 										className='w-full h-16 text-lg'
 										onClick={() => setCurrentPage("video")}
 									>

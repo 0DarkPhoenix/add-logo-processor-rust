@@ -52,7 +52,7 @@ function Progress({ className, value, ...props }: ProgressProps) {
 				data-slot='progress-indicator'
 				className={cn(
 					"h-full w-full flex-1 transition-all relative overflow-hidden",
-					"bg-gradient-to-r from-cyan-500 via-sky-500 to-indigo-500 rounded-l-full",
+					"bg-gradient-to-r from-blue-500 via-sky-500 to-purple-500 rounded-l-full",
 				)}
 				style={{ transform: `translateX(-${100 - progressValue}%)` }}
 			>
