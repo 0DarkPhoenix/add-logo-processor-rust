@@ -7,19 +7,26 @@ import {
 	Select,
 	SelectContent,
 	SelectItem,
+	SelectSeparator,
 	SelectTrigger,
 	SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select-favorite";
 import { Switch } from "@/components/ui/switch";
 import type { VideoSettings } from "@/types/VideoSettings";
+
+interface VideoResizeDimensionsCardProps {
+	supportedVideoFormats: string[];
+	supportedVideoCodecs: string[];
+	videoSettings: VideoSettings | null;
+	updateVideoSettings: (settings: VideoSettings) => void;
+}
 
 export function VideoResizeDimensionsCard({
 	supportedVideoFormats,
 	supportedVideoCodecs,
-}: {
-	supportedVideoFormats: string[];
-	supportedVideoCodecs: string[];
-}) {
+	videoSettings,
+	updateVideoSettings,
+}: VideoResizeDimensionsCardProps) {
 	const { setValue, watch } = useFormContext<VideoSettings>();
 	const baseId = useId();
 
@@ -28,6 +35,51 @@ export function VideoResizeDimensionsCard({
 	const format = watch("format");
 	const shouldConvertCodec = watch("shouldConvertCodec");
 	const codec = watch("codec");
+
+	const favoriteFormats = videoSettings?.formatFavoriteList || [];
+	const favoriteCodecs = videoSettings?.codecFavoriteList || [];
+
+	const handleToggleFavoriteFormat = (format: string) => {
+		if (!videoSettings) {
+			return;
+		}
+
+		let updatedFavorites: string[];
+
+		if (videoSettings.formatFavoriteList.includes(format)) {
+			// Remove from favorites
+			updatedFavorites = videoSettings.formatFavoriteList.filter((f) => f !== format);
+		} else {
+			// Add to favorites
+			updatedFavorites = [...videoSettings.formatFavoriteList, format];
+		}
+
+		updateVideoSettings({
+			...videoSettings,
+			formatFavoriteList: updatedFavorites,
+		});
+	};
+
+	const handleToggleFavoriteCodec = (codec: string) => {
+		if (!videoSettings) {
+			return;
+		}
+
+		let updatedFavorites: string[];
+
+		if (videoSettings.codecFavoriteList.includes(codec)) {
+			// Remove from favorites
+			updatedFavorites = videoSettings.codecFavoriteList.filter((f) => f !== codec);
+		} else {
+			// Add to favorites
+			updatedFavorites = [...videoSettings.codecFavoriteList, codec];
+		}
+
+		updateVideoSettings({
+			...videoSettings,
+			codecFavoriteList: updatedFavorites,
+		});
+	};
 
 	return (
 		<Card>
@@ -79,11 +131,34 @@ export function VideoResizeDimensionsCard({
 								<SelectValue placeholder='Select output format...' />
 							</SelectTrigger>
 							<SelectContent>
-								{supportedVideoFormats.map((format) => (
-									<SelectItem key={format} value={format}>
+								{/* Render favorites first */}
+								{favoriteFormats.map((format) => (
+									<SelectItem
+										key={`favorite-${format}`}
+										value={format}
+										isFavorite={true}
+										onFavorite={handleToggleFavoriteFormat}
+									>
 										{format.toUpperCase()}
 									</SelectItem>
 								))}
+
+								{/* Optional separator */}
+								{favoriteFormats.length > 0 && <SelectSeparator />}
+
+								{/* Regular items */}
+								{supportedVideoFormats
+									.filter((format) => !favoriteFormats.includes(format))
+									.map((format) => (
+										<SelectItem
+											key={`item-${format}`}
+											value={format}
+											isFavorite={favoriteFormats.includes(format)}
+											onFavorite={handleToggleFavoriteFormat}
+										>
+											{format.toUpperCase()}
+										</SelectItem>
+									))}
 							</SelectContent>
 						</Select>
 					</div>
@@ -109,7 +184,7 @@ export function VideoResizeDimensionsCard({
 							onValueChange={(value) => {
 								// Guard against empty string on initial render
 								if (value) {
-									setValue("format", value);
+									setValue("codec", value);
 								}
 							}}
 							disabled={!shouldConvertCodec}
@@ -118,11 +193,34 @@ export function VideoResizeDimensionsCard({
 								<SelectValue placeholder='Select output codec...' />
 							</SelectTrigger>
 							<SelectContent>
-								{supportedVideoCodecs.map((codec) => (
-									<SelectItem key={codec} value={codec}>
-										{codec.toUpperCase()}
+								{/* Render favorites first */}
+								{favoriteCodecs.map((format) => (
+									<SelectItem
+										key={`favorite-${format}`}
+										value={format}
+										isFavorite={true}
+										onFavorite={handleToggleFavoriteFormat}
+									>
+										{format.toUpperCase()}
 									</SelectItem>
 								))}
+
+								{/* Optional separator */}
+								{favoriteCodecs.length > 0 && <SelectSeparator />}
+
+								{/* Regular items */}
+								{supportedVideoCodecs
+									.filter((codec) => !favoriteCodecs.includes(codec))
+									.map((codec) => (
+										<SelectItem
+											key={`item-${codec}`}
+											value={codec}
+											isFavorite={favoriteCodecs.includes(codec)}
+											onFavorite={handleToggleFavoriteCodec}
+										>
+											{codec.toUpperCase()}
+										</SelectItem>
+									))}
 							</SelectContent>
 						</Select>
 					</div>

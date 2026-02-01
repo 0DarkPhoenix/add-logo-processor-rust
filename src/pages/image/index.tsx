@@ -32,10 +32,16 @@ export default function ImageProcessingPage() {
 		return () => subscription.unsubscribe();
 	}, [form, isInitialized, updateImageSettings]);
 
-	const onSubmit = async (data: ImageSettings) => {
+	const onSubmit = async (data: Partial<ImageSettings>) => {
+		// Merge form data with existing imageSettings to preserve fields not in the form
+		const mergedSettings: ImageSettings = {
+			...imageSettings,
+			...data,
+		} as ImageSettings;
+
 		setIsProcessing(true);
 		try {
-			await invoke("process_images", { imageSettings: data });
+			await invoke("process_images", { imageSettings: mergedSettings });
 		} catch (error) {
 			console.error("Processing failed:", error);
 		} finally {
@@ -62,7 +68,11 @@ export default function ImageProcessingPage() {
 					>
 						<DirectorySelectionCard />
 
-						<ImageResizeDimensionsCard supportedImageFormats={supportedImageFormats} />
+						<ImageResizeDimensionsCard
+							supportedImageFormats={supportedImageFormats}
+							imageSettings={imageSettings}
+							updateImageSettings={updateImageSettings}
+						/>
 
 						<LogoConfiguratorCard />
 

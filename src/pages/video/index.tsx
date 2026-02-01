@@ -39,9 +39,15 @@ export default function VideoProcessingPage() {
 	}, [form, isInitialized, updateVideoSettings]);
 
 	const onSubmit = async (data: VideoSettings) => {
+		// Merge form data with existing imageSettings to preserve fields not in the form
+		const mergedSettings: VideoSettings = {
+			...videoSettings,
+			...data,
+		} as VideoSettings;
+
 		setIsProcessing(true);
 		try {
-			await invoke("process_videos", { videoSettings: data });
+			await invoke("process_videos", { videoSettings: mergedSettings });
 		} catch (error) {
 			console.error("Processing failed:", error);
 		} finally {
@@ -71,6 +77,8 @@ export default function VideoProcessingPage() {
 						<VideoResizeDimensionsCard
 							supportedVideoFormats={supportedVideoFormats}
 							supportedVideoCodecs={supportedVideoCodecs}
+							videoSettings={videoSettings}
+							updateVideoSettings={updateVideoSettings}
 						/>
 
 						<LogoConfiguratorCard />

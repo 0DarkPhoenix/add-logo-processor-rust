@@ -7,23 +7,53 @@ import {
 	Select,
 	SelectContent,
 	SelectItem,
+	SelectSeparator,
 	SelectTrigger,
 	SelectValue,
-} from "@/components/ui/select";
+} from "@/components/ui/select-favorite";
 import { Switch } from "@/components/ui/switch";
 import type { ImageSettings } from "@/types/ImageSettings";
 
+interface ImageResizeDimensionsCardProps {
+	supportedImageFormats: string[];
+	imageSettings: ImageSettings | null;
+	updateImageSettings: (settings: ImageSettings) => void;
+}
+
 export function ImageResizeDimensionsCard({
 	supportedImageFormats,
-}: {
-	supportedImageFormats: string[];
-}) {
+	imageSettings,
+	updateImageSettings,
+}: ImageResizeDimensionsCardProps) {
 	const { setValue, watch } = useFormContext<ImageSettings>();
 	const baseId = useId();
 
 	const minPixelCount = watch("minPixelCount");
 	const shouldConvertFormat = watch("shouldConvertFormat");
 	const format = watch("format");
+
+	const favoriteFormats = imageSettings?.formatFavoriteList || [];
+
+	const handleToggleFavoriteFormat = (format: string) => {
+		if (!imageSettings) {
+			return;
+		}
+
+		let updatedFavorites: string[];
+
+		if (imageSettings.formatFavoriteList.includes(format)) {
+			// Remove from favorites
+			updatedFavorites = imageSettings.formatFavoriteList.filter((f) => f !== format);
+		} else {
+			// Add to favorites
+			updatedFavorites = [...imageSettings.formatFavoriteList, format];
+		}
+
+		updateImageSettings({
+			...imageSettings,
+			formatFavoriteList: updatedFavorites,
+		});
+	};
 
 	return (
 		<Card>
@@ -45,7 +75,6 @@ export function ImageResizeDimensionsCard({
 						className='mt-1'
 					/>
 				</div>
-
 				{/* Format Conversion Section */}
 				<div className='space-y-4'>
 					<div className='flex items-center space-x-2'>
@@ -71,15 +100,38 @@ export function ImageResizeDimensionsCard({
 							}}
 							disabled={!shouldConvertFormat}
 						>
-							<SelectTrigger id={`${baseId}-format`} className='mt-1'>
-								<SelectValue placeholder='Select format...' />
+							<SelectTrigger>
+								<SelectValue placeholder='Select output format...' />
 							</SelectTrigger>
 							<SelectContent>
-								{supportedImageFormats.map((format) => (
-									<SelectItem key={format} value={format}>
+								{/* Render favorites first */}
+								{favoriteFormats.map((format) => (
+									<SelectItem
+										key={`favorite-${format}`}
+										value={format}
+										isFavorite={true}
+										onFavorite={handleToggleFavoriteFormat}
+									>
 										{format.toUpperCase()}
 									</SelectItem>
 								))}
+
+								{/* Optional separator */}
+								{favoriteFormats.length > 0 && <SelectSeparator />}
+
+								{/* Regular items */}
+								{supportedImageFormats
+									.filter((format) => !favoriteFormats.includes(format))
+									.map((format) => (
+										<SelectItem
+											key={`item-${format}`}
+											value={format}
+											isFavorite={favoriteFormats.includes(format)}
+											onFavorite={handleToggleFavoriteFormat}
+										>
+											{format.toUpperCase()}
+										</SelectItem>
+									))}
 							</SelectContent>
 						</Select>
 					</div>

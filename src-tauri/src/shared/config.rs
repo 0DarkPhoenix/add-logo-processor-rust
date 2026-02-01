@@ -60,126 +60,139 @@ pub struct AppConfig {
 #[ts(export, export_to = "../../src/types/", rename_all = "camelCase")]
 #[serde(rename_all = "camelCase")]
 pub struct ImageSettings {
+    pub add_logo: bool,
+    pub clear_files_input_directory: bool,
+    pub clear_files_output_directory: bool,
+    #[serde(alias = "favorite_formats")] // Deprecated field names
+    pub format_favorite_list: Vec<String>,
+    pub format: String,
     #[serde(
         serialize_with = "serialize_pathbuf",
         deserialize_with = "deserialize_pathbuf"
     )]
     #[ts(type = "string")]
     pub input_directory: PathBuf,
-
-    #[serde(
-        serialize_with = "serialize_pathbuf",
-        deserialize_with = "deserialize_pathbuf"
-    )]
-    #[ts(type = "string")]
-    pub output_directory: PathBuf,
-
-    pub clear_files_input_directory: bool,
-    pub search_child_folders: bool,
-    pub clear_files_output_directory: bool,
     pub keep_child_folders_structure_in_output_directory: bool,
-    pub overwrite_existing_files_output_directory: bool,
-    pub min_pixel_count: u32,
-    pub add_logo: bool,
-
+    pub logo_corner: Corner,
     #[serde(
         serialize_with = "serialize_optional_pathbuf",
         deserialize_with = "deserialize_optional_pathbuf"
     )]
     #[ts(type = "string | null")]
     pub logo_path: Option<PathBuf>,
-
     pub logo_scale: u32,
     pub logo_x_offset_scale: i32,
     pub logo_y_offset_scale: i32,
-    pub logo_corner: Corner,
+    pub min_pixel_count: u32,
+    #[serde(
+        serialize_with = "serialize_pathbuf",
+        deserialize_with = "deserialize_pathbuf"
+    )]
+    #[ts(type = "string")]
+    pub output_directory: PathBuf,
+    pub overwrite_existing_files_output_directory: bool,
+    pub search_child_folders: bool,
     pub should_convert_format: bool,
-    pub format: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../../src/types/", rename_all = "camelCase")]
 #[serde(rename_all = "camelCase")]
 pub struct VideoSettings {
+    pub add_logo: bool,
+    pub clear_files_input_directory: bool,
+    pub clear_files_output_directory: bool,
+    #[serde(alias = "favorite_codecs")] // Deprecated field names
+    pub codec_favorite_list: Vec<String>,
+    pub codec: String,
+    #[serde(alias = "favorite_formats")] // Deprecated field names
+    pub format_favorite_list: Vec<String>,
+    pub format: String,
     #[serde(
         serialize_with = "serialize_pathbuf",
         deserialize_with = "deserialize_pathbuf"
     )]
     #[ts(type = "string")]
     pub input_directory: PathBuf,
-
-    #[serde(
-        serialize_with = "serialize_pathbuf",
-        deserialize_with = "deserialize_pathbuf"
-    )]
-    #[ts(type = "string")]
-    pub output_directory: PathBuf,
-
-    pub clear_files_input_directory: bool,
-    pub search_child_folders: bool,
-    pub clear_files_output_directory: bool,
     pub keep_child_folders_structure_in_output_directory: bool,
-    pub overwrite_existing_files_output_directory: bool,
-    pub min_pixel_count: u32,
-    pub add_logo: bool,
-
+    pub logo_corner: Corner,
     #[serde(
         serialize_with = "serialize_optional_pathbuf",
         deserialize_with = "deserialize_optional_pathbuf"
     )]
     #[ts(type = "string | null")]
     pub logo_path: Option<PathBuf>,
-
     pub logo_scale: u32,
     pub logo_x_offset_scale: i32,
     pub logo_y_offset_scale: i32,
-    pub logo_corner: Corner,
-    pub should_convert_format: bool,
-    pub format: String,
+    pub min_pixel_count: u32,
+    #[serde(
+        serialize_with = "serialize_pathbuf",
+        deserialize_with = "deserialize_pathbuf"
+    )]
+    #[ts(type = "string")]
+    pub output_directory: PathBuf,
+    pub overwrite_existing_files_output_directory: bool,
+    pub search_child_folders: bool,
     pub should_convert_codec: bool,
-    pub codec: String,
+    pub should_convert_format: bool,
 }
 
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
             image_settings: ImageSettings {
-                input_directory: PathBuf::from("input"),
-                output_directory: PathBuf::from("output"),
-                search_child_folders: false,
-                keep_child_folders_structure_in_output_directory: false,
-                min_pixel_count: 1080,
                 add_logo: false,
+                clear_files_input_directory: false,
+                clear_files_output_directory: false,
+                format_favorite_list: vec![
+                    image_format::JPEG.extensions[0].to_string(),
+                    image_format::PNG.extensions[0].to_string(),
+                    image_format::WEBP.extensions[0].to_string(),
+                ],
+                format: image_format::PNG.extensions[0].to_string(),
+                input_directory: PathBuf::from("input"),
+                keep_child_folders_structure_in_output_directory: false,
+                logo_corner: Corner::TopLeft,
                 logo_path: None,
                 logo_scale: 10,
                 logo_x_offset_scale: 0,
                 logo_y_offset_scale: 0,
-                logo_corner: Corner::TopLeft,
-                should_convert_format: false,
-                format: image_format::PNG.extensions[0].to_string(),
-                clear_files_input_directory: false,
-                clear_files_output_directory: false,
+                min_pixel_count: 1080,
+                output_directory: PathBuf::from("output"),
                 overwrite_existing_files_output_directory: false,
+                search_child_folders: false,
+                should_convert_format: false,
             },
             video_settings: VideoSettings {
-                input_directory: PathBuf::from("input"),
-                output_directory: PathBuf::from("output"),
-                search_child_folders: false,
-                keep_child_folders_structure_in_output_directory: false,
-                min_pixel_count: 1080,
                 add_logo: false,
+                clear_files_input_directory: false,
+                clear_files_output_directory: false,
+                codec_favorite_list: vec![
+                    video_codec::H264.name.to_string(),
+                    video_codec::HEVC.name.to_string(),
+                    video_codec::VP9.name.to_string(),
+                ],
+                codec: video_codec::H264.name.to_string(),
+                format_favorite_list: vec![
+                    video_format::MKV.extensions[0].to_string(),
+                    video_format::MOV.extensions[0].to_string(),
+                    video_format::MP4.extensions[0].to_string(),
+                ],
+                format: video_format::MP4.extensions[0].to_string(),
+                input_directory: PathBuf::from("input"),
+                keep_child_folders_structure_in_output_directory: false,
+                logo_corner: Corner::TopLeft,
                 logo_path: None,
                 logo_scale: 10,
                 logo_x_offset_scale: 0,
                 logo_y_offset_scale: 0,
-                logo_corner: Corner::TopLeft,
-                should_convert_format: false,
-                format: video_format::MP4.extensions[0].to_string(),
-                should_convert_codec: false,
-                codec: video_codec::H264.name.to_string(),
-                clear_files_input_directory: false,
-                clear_files_output_directory: false,
+                min_pixel_count: 1080,
+                output_directory: PathBuf::from("output"),
                 overwrite_existing_files_output_directory: false,
+                search_child_folders: false,
+                should_convert_codec: false,
+                should_convert_format: false,
             },
         }
     }
@@ -250,15 +263,24 @@ impl AppConfig {
     pub fn load_or_create_default(app_handle: &AppHandle) -> Result<AppConfig, Box<dyn Error>> {
         let config_path = Self::get_config_path(app_handle)?;
 
-        if config_path.exists() {
+        let config = if config_path.exists() {
             let config_str = fs::read_to_string(&config_path)?;
-            let config: AppConfig = serde_json::from_str(&config_str)?;
-            Ok(config)
+            match serde_json::from_str::<AppConfig>(&config_str) {
+                Ok(config) => config,
+                Err(_) => {
+                    // Deserialization failed, attempt migration
+                    let mut config = AppConfig::default();
+                    config.migrate_current_config(app_handle)?;
+                    config
+                }
+            }
         } else {
             let default_config = AppConfig::default();
             default_config.save(app_handle)?;
-            Ok(default_config)
-        }
+            default_config
+        };
+
+        Ok(config)
     }
 
     /// Update only image settings and save (instance method)
@@ -281,8 +303,52 @@ impl AppConfig {
         self.save(app_handle)
     }
 
+    /// Migrates the current config to a newer version of the AppConfig struct
+    ///
+    /// This function creates a new default AppConfig and merges in existing values from the current config file,
+    /// effectively migrating the current config to the new config structure.
+    ///
+    /// ## Note
+    /// Config settings which are renamed are migrated by reading the old setting's value
+    /// using serde (e.g. `#[serde(alias = "<old-name>", alias = "<another-old-name>")]` above a settings name)
+    /// and are saved using the new name (done when saving the new config to `config.json`).
+    fn migrate_current_config(&mut self, app_handle: &AppHandle) -> Result<(), Box<dyn Error>> {
+        let config_path = Self::get_config_path(app_handle)?;
+        let config_str = fs::read_to_string(&config_path)?;
+        let current_config: serde_json::Value = serde_json::from_str(&config_str)?;
+
+        // Create default config and merge in current values
+        let mut app_config_json = serde_json::to_value(AppConfig::default())?;
+
+        if let Some(obj) = app_config_json.as_object_mut() {
+            if let Some(current_obj) = current_config.as_object() {
+                for (key, value) in current_obj.iter() {
+                    // If both are objects, merge them recursively
+                    if let (
+                        Some(serde_json::Value::Object(default_nested)),
+                        serde_json::Value::Object(current_nested),
+                    ) = (obj.get_mut(key), value)
+                    {
+                        for (nested_key, nested_value) in current_nested.iter() {
+                            default_nested.insert(nested_key.clone(), nested_value.clone());
+                        }
+                        continue;
+                    }
+                    // Otherwise, replace the entire value
+                    obj.insert(key.clone(), value.clone());
+                }
+            }
+        }
+
+        let new_config: AppConfig = serde_json::from_value(app_config_json)?;
+        *self = new_config;
+        self.save(app_handle)?;
+
+        Ok(())
+    }
+
     /// Save configuration to file
-    pub fn save(&self, app_handle: &AppHandle) -> Result<(), Box<dyn Error>> {
+    fn save(&self, app_handle: &AppHandle) -> Result<(), Box<dyn Error>> {
         let config_path = Self::get_config_path(app_handle)?;
 
         // Create config directory if it doesn't exist
