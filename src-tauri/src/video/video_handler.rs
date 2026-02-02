@@ -21,6 +21,11 @@ use crate::video::video_validator::VideoSettingsValidator;
 use crate::VideoSettings;
 
 pub fn handle_videos(video_settings: &VideoSettings) -> Result<(), Box<dyn Error + Send + Sync>> {
+    info!(
+        "Starting video processing with settings: {:?}",
+        video_settings,
+    );
+
     // Clear any previous processes at the start
     ProcessManager::clear();
 
@@ -247,6 +252,8 @@ fn create_video_ffmpeg_command(
     }
 
     cmd.args(["-map", "0:a?"]);
+
+    cmd.args(["-c:v", &video.codec]);
 
     let file_stem = video
         .file_path

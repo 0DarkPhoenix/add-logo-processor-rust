@@ -21,6 +21,11 @@ use crate::shared::progress_handler::{ProgressManager, ProgressMode};
 use crate::ImageSettings;
 
 pub fn handle_images(image_settings: &ImageSettings) -> Result<(), Box<dyn Error + Send + Sync>> {
+    info!(
+        "Starting image processing with settings: {:?}",
+        image_settings,
+    );
+
     // Clear any previous processes at the start
     ProcessManager::clear();
 

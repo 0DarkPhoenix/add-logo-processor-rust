@@ -39,7 +39,7 @@ export default function VideoProcessingPage() {
 	}, [form, isInitialized, updateVideoSettings]);
 
 	const onSubmit = async (data: VideoSettings) => {
-		// Merge form data with existing imageSettings to preserve fields not in the form
+		// Merge form data with existing videoSettings to preserve fields not in the form
 		const mergedSettings: VideoSettings = {
 			...videoSettings,
 			...data,
