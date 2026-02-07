@@ -9,10 +9,10 @@ Next.js + [Shadcn/ui](https://ui.shadcn.com/docs/installation)
 ### Updater through Tauri
 https://v2.tauri.app/plugin/updater/
 
-### Image resizer
-
-### Image logo applier
-https://crates.io/crates/image
-
-### Video logo applier
-https://video.stackexchange.com/questions/12105/add-an-image-overlay-in-front-of-video-using-ffmpeg
+## Checklist for first Alpha release:
+- [ ] Create better structured and more complete Readme.md
+- [ ] Different options for resolution configuration modes
+- [ ] Feedback in frontend for errors that happened in the backend
+- [ ] Fix inconsistencies in frontend and backend when cancelling a process
+- [ ] Set up Tauri updater and test config.json updater
+- [ ] Set up Github actions for building application to Windows, MacOS and Linux after merge to main
