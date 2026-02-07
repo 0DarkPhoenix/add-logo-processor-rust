@@ -4,9 +4,10 @@ import { AppLayout } from "./components/layout/AppLayout";
 import { Button } from "./components/ui/button";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import ImageProcessingPage from "./pages/image/index";
+import SettingsPage from "./pages/settings";
 import VideoProcessingPage from "./pages/video/index";
 
-type Page = "home" | "image" | "video";
+export type Page = "home" | "image" | "video" | "settings";
 
 function App() {
 	const [currentPage, setCurrentPage] = useState<Page>("home");
@@ -23,6 +24,12 @@ function App() {
 				return (
 					<AppLayout currentPage={currentPage} onPageChange={setCurrentPage}>
 						<VideoProcessingPage />
+					</AppLayout>
+				);
+			case "settings":
+				return (
+					<AppLayout currentPage={currentPage} onPageChange={setCurrentPage}>
+						<SettingsPage />
 					</AppLayout>
 				);
 			default:

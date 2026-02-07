@@ -54,6 +54,8 @@ pub fn run() {
             commands::load_config,
             commands::get_progress_info,
             commands::cancel_process,
+            commands::show_config_in_folder,
+            commands::show_log_in_folder,
             commands::process_images,
             commands::get_supported_image_formats,
             commands::process_videos,
