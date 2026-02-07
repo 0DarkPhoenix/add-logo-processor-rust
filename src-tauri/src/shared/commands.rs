@@ -93,7 +93,7 @@ pub fn show_log_in_folder(app_handle: AppHandle) -> Result<(), String> {
         Command::new("explorer")
             .arg(&log_dir)
             .spawn()
-            .map_err(|e| format!("Failed to open file explorer: {}", e))?;
+            .map_err(|e| format!("Failed to open Windows file explorer: {}", e))?;
     }
 
     #[cfg(target_os = "macos")]
@@ -101,7 +101,7 @@ pub fn show_log_in_folder(app_handle: AppHandle) -> Result<(), String> {
         Command::new("open")
             .arg(&log_dir)
             .spawn()
-            .map_err(|e| format!("Failed to open file explorer: {}", e))?;
+            .map_err(|e| format!("Failed to open MacOS file explorer: {}", e))?;
     }
 
     #[cfg(target_os = "linux")]
@@ -109,7 +109,7 @@ pub fn show_log_in_folder(app_handle: AppHandle) -> Result<(), String> {
         Command::new("xdg-open")
             .arg(&log_dir)
             .spawn()
-            .map_err(|e| format!("Failed to open file explorer: {}", e))?;
+            .map_err(|e| format!("Failed to open Linux file explorer: {}", e))?;
     }
 
     Ok(())
