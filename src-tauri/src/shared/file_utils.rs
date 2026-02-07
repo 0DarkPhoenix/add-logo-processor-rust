@@ -1,12 +1,12 @@
+use crate::shared::process_manager::check_process_cancelled;
 use remove_dir_all::remove_dir_all;
 use std::fs::{read_dir, remove_file};
+use std::process::Command;
 use std::{
     error::Error,
     fs::{create_dir_all, metadata},
     path::{Path, PathBuf},
 };
-
-use crate::shared::process_manager::check_process_cancelled;
 
 pub fn read_file_size(file_path: &PathBuf) -> Result<u64, Box<dyn Error + Send + Sync>> {
     let metadata = metadata(file_path)?;
@@ -59,4 +59,32 @@ pub fn get_relative_path(
 ) -> Result<PathBuf, Box<dyn Error>> {
     let relative_path = file_path.strip_prefix(base_directory)?;
     Ok(relative_path.to_path_buf())
+}
+
+/// Open a provided path in the native file explorer of an operating system
+pub fn show_in_file_explorer(path: &Path) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map_err(|e| format!("Failed to open Windows file explorer: {}", e))?;
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open MacOS file explorer: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open Linux file explorer: {}", e))?;
+    }
+    Ok(())
 }

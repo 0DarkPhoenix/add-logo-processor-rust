@@ -2,15 +2,16 @@ use tauri::{AppHandle, Manager, State};
 
 use crate::{
     image::{image_formats::IMAGE_FORMAT_REGISTRY, image_handler::handle_images},
-    shared::{process_manager::ProcessManager, progress_handler::ProgressManager},
+    shared::{
+        file_utils::show_in_file_explorer, process_manager::ProcessManager,
+        progress_handler::ProgressManager,
+    },
     video::{
         video_codecs::VIDEO_CODEC_REGISTRY, video_formats::VIDEO_FORMAT_REGISTRY,
         video_handler::handle_videos,
     },
     AppConfig, AppState, ImageSettings, ProgressInfo, VideoSettings,
 };
-
-use std::process::Command;
 
 /* -------------------------------------------------------------------------- */
 /*                                   GENERAL                                  */
@@ -44,34 +45,7 @@ pub fn show_config_in_folder(app_handle: AppHandle) -> Result<(), String> {
         .app_config_dir()
         .map_err(|e| format!("Failed to get config directory: {}", e))?;
 
-    // Create directory if it doesn't exist
-    std::fs::create_dir_all(&config_dir)
-        .map_err(|e| format!("Failed to create config directory: {}", e))?;
-
-    // Open the directory in the native file explorer
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("explorer")
-            .arg(&config_dir)
-            .spawn()
-            .map_err(|e| format!("Failed to open file explorer: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(&config_dir)
-            .spawn()
-            .map_err(|e| format!("Failed to open file explorer: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(&config_dir)
-            .spawn()
-            .map_err(|e| format!("Failed to open file explorer: {}", e))?;
-    }
+    show_in_file_explorer(&config_dir)?;
 
     Ok(())
 }
@@ -83,34 +57,7 @@ pub fn show_log_in_folder(app_handle: AppHandle) -> Result<(), String> {
         .app_log_dir()
         .map_err(|e| format!("Failed to get log directory: {}", e))?;
 
-    // Create directory if it doesn't exist
-    std::fs::create_dir_all(&log_dir)
-        .map_err(|e| format!("Failed to create log directory: {}", e))?;
-
-    // Open the directory in the native file explorer
-    #[cfg(target_os = "windows")]
-    {
-        Command::new("explorer")
-            .arg(&log_dir)
-            .spawn()
-            .map_err(|e| format!("Failed to open Windows file explorer: {}", e))?;
-    }
-
-    #[cfg(target_os = "macos")]
-    {
-        Command::new("open")
-            .arg(&log_dir)
-            .spawn()
-            .map_err(|e| format!("Failed to open MacOS file explorer: {}", e))?;
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        Command::new("xdg-open")
-            .arg(&log_dir)
-            .spawn()
-            .map_err(|e| format!("Failed to open Linux file explorer: {}", e))?;
-    }
+    show_in_file_explorer(&log_dir)?;
 
     Ok(())
 }
