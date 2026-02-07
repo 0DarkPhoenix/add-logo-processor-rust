@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::time::Duration;
 
 use crate::ProgressInfo;
-
+use crossterm::terminal;
 #[derive(Debug)]
 pub struct TerminalProgressBar {
     width: usize,
@@ -12,6 +12,7 @@ pub struct TerminalProgressBar {
     show_elapsed: bool,
     is_displayed: bool,
     last_progress_line: String,
+    scroll_region_active: bool,
 }
 
 impl TerminalProgressBar {
@@ -24,6 +25,7 @@ impl TerminalProgressBar {
             show_elapsed: true,
             is_displayed: false,
             last_progress_line: String::new(),
+            scroll_region_active: false,
         }
     }
 
@@ -176,27 +178,62 @@ impl TerminalProgressBar {
         }
     }
 
-    fn setup_persistent_progress(&self) {
-        // Move to bottom and create space for progress bar
-        print!("\x1b[s"); // Save cursor position
-        print!("\x1b[999;999H"); // Move to bottom-right corner
-        println!(); // Add a new line for our progress bar
-        print!("\x1b[u"); // Restore cursor position
+    fn setup_persistent_progress(&mut self) {
+        if let Ok((_, rows)) = terminal::size() {
+            if rows > 1 {
+                // Reserve last line for the progress bar
+                print!("\x1b[1;{}r", rows - 1); // set scroll region (1..rows-1)
+                self.scroll_region_active = true;
+
+                // Clear the reserved line
+                print!("\x1b[{};1H", rows); // move to last line
+                print!("\x1b[K"); // clear line
+                print!("\x1b[1;1H"); // move to top to keep normal output in region
+                return;
+            }
+        }
+
+        // Fallback (no scroll region)
+        print!("\x1b[s");
+        print!("\x1b[999;999H");
+        println!();
+        print!("\x1b[u");
     }
 
     fn update_persistent_progress(&self, progress_line: &str) {
-        print!("\x1b[s"); // Save cursor position
-        print!("\x1b[999;1H"); // Move to last line, first column
-        print!("\x1b[K"); // Clear the line
+        if let Ok((_, rows)) = terminal::size() {
+            if rows > 0 {
+                print!("\x1b[s"); // Save cursor
+                print!("\x1b[{};1H", rows); // Move to last line
+                print!("\x1b[K"); // Clear line
+                print!("{}", progress_line);
+                print!("\x1b[u"); // Restore cursor
+                return;
+            }
+        }
+
+        // Fallback
+        print!("\x1b[s");
+        print!("\x1b[999;1H");
+        print!("\x1b[K");
         print!("{}", progress_line);
-        print!("\x1b[u"); // Restore cursor position
+        print!("\x1b[u");
     }
 
-    fn clear_persistent_progress(&self) {
-        print!("\x1b[s"); // Save cursor position
-        print!("\x1b[999;1H"); // Move to last line, first column
-        print!("\x1b[K"); // Clear the line
-        print!("\x1b[u"); // Restore cursor position
+    fn clear_persistent_progress(&mut self) {
+        if let Ok((_, rows)) = terminal::size() {
+            if rows > 0 {
+                print!("\x1b[s");
+                print!("\x1b[{};1H", rows);
+                print!("\x1b[K");
+                print!("\x1b[u");
+            }
+        }
+
+        if self.scroll_region_active {
+            print!("\x1b[r"); // Reset scroll region
+            self.scroll_region_active = false;
+        }
     }
 
     fn format_duration(duration: Duration) -> String {
