@@ -1,6 +1,6 @@
 # Add Logo Processor
 
-Application to resize and add a logo to images in bulk. This project has been written before in Python, with this version being rewritten with a Rust back-end a Typescript front-end using Tauri
+Application to resize and add a logo to images in bulk. [This project has been written before in Python](https://github.com/0DarkPhoenix/Add-Logo-Processor), with this version being rewritten with a Rust back-end a Typescript front-end using Tauri
 
 ### Frontend
 Typescript
